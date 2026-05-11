@@ -1,0 +1,6 @@
+{
+    "python.defaultInterpreterPath": "/Users/komiyuunosuke/LecturesProgress/城間研/cui-learning-webui/backend/.venv/bin/python",
+    "python.analysis.extraPaths": [
+        "./backend"
+    ]
+}
