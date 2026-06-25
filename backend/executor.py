@@ -6,8 +6,12 @@ Alpine Linuxの使い捨てコンテナを起動し、標準出力を取得し�
 
 import docker
 import logging
+import os
 
 logger = logging.getLogger(__name__)
+
+# ワードリストのローカルパス
+WORDLISTS_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "wordlists"))
 
 # サンドボックス設定
 SANDBOX_IMAGE = "instrumentisto/nmap:latest"
@@ -22,12 +26,13 @@ RESOURCE_LIMITS = {
 }
 
 
-def run_command_in_sandbox(command: list[str]) -> dict:
+def run_command_in_sandbox(command: list[str], image: str = SANDBOX_IMAGE) -> dict:
     """
     Dockerコンテナ内でコマンドを実行し、結果を返す。
 
     Args:
         command: 実行するコマンドのリスト（例: ["nmap", "-sV", "target"]）
+        image: 使用するDockerイメージ
 
     Returns:
         {
@@ -38,20 +43,26 @@ def run_command_in_sandbox(command: list[str]) -> dict:
     """
     client = docker.from_env()
 
+    # Determine dynamic limits based on image
+    mem_limit = RESOURCE_LIMITS["mem_limit"]
+    if "metasploit" in image.lower():
+        mem_limit = "512m"  # metasploit requires more memory
+
     try:
-        logger.info(f"Executing in sandbox: {' '.join(command)}")
+        logger.info(f"Executing in sandbox [{image}]: {' '.join(command)}")
 
         # コンテナを起動してコマンドを実行（--rm 相当の使い捨て）
         result = client.containers.run(
-            image=SANDBOX_IMAGE,
+            image=image,
             command=command,
             remove=True,           # 実行後にコンテナを自動削除
             stdout=True,
             stderr=True,
-            mem_limit=RESOURCE_LIMITS["mem_limit"],
+            mem_limit=mem_limit,
             cpu_period=RESOURCE_LIMITS["cpu_period"],
             cpu_quota=RESOURCE_LIMITS["cpu_quota"],
-            # network_mode=RESOURCE_LIMITS["network_mode"],  # nmapテスト時はコメントアウト
+            volumes={WORDLISTS_DIR: {"bind": "/usr/share/wordlists", "mode": "ro"}},
+            network_mode=RESOURCE_LIMITS["network_mode"] if "iperf" not in image.lower() and "metasploit" not in image.lower() else "bridge",  # iperf3 & metasploit need network
         )
 
         stdout = result.decode("utf-8", errors="replace") if result else ""
@@ -73,7 +84,7 @@ def run_command_in_sandbox(command: list[str]) -> dict:
     except docker.errors.ImageNotFound:
         return {
             "stdout": "",
-            "stderr": f"[ERROR] Docker image '{SANDBOX_IMAGE}' not found. Run: docker pull {SANDBOX_IMAGE}",
+            "stderr": f"[ERROR] Docker image '{image}' not found. Run: docker pull {image}",
             "exit_code": 127,
         }
 

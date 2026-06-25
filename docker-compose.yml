@@ -8,3 +8,9 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
     environment:
       - PYTHONUNBUFFERED=1
+  iperf3-server:
+    image: networkstatic/iperf3
+    command: -s
+    ports:
+      - "5201:5201"
+    container_name: iperf3-server

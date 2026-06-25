@@ -240,61 +240,380 @@
 
   <div class="workspace">
     <!-- ══ 左ペイン: オプション選択 ══ -->
-    <aside class="left-panel">
-      <div class="panel-header"><span class="dot"></span>nmap オプション設定</div>
-      <div class="options-body">
+    <aside class="left-panel flex flex-col h-full overflow-hidden">
+      <div class="panel-header flex-shrink-0"><span class="dot"></span>ツール & オプション設定</div>
+      
+      <!-- ツール切り替え -->
+      <div class="px-4 pt-3 pb-1 border-b border-gray-800 flex-shrink-0">
+        <label class="opt-label group relative flex items-center gap-1 w-max mb-1" for="toolSelector">
+          🧰 ツール選択
+          <svg class="w-3 h-3 text-gray-500 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+          <div class="hidden group-hover:block absolute left-0 top-full mt-1 w-48 p-2 bg-gray-800 text-white text-xs rounded z-50 border border-gray-600 shadow-lg font-normal normal-case">
+            使用するサイバーセキュリティツールを選択します。
+          </div>
+        </label>
+        <select id="toolSelector" class="w-full bg-gray-900 border border-gray-700 text-white rounded p-1 mb-2 text-sm" onchange="switchTool()">
+          <option value="nmap">nmap (ポートスキャン)</option>
+          <option value="gobuster">gobuster (ディレクトリ探索)</option>
+          <option value="curl">curl (HTTPリクエスト)</option>
+          <option value="hydra">hydra (オンライン辞書攻撃)</option>
+          <option value="aircrack-ng">aircrack-ng (オフライン辞書攻撃)</option>
+          <option value="iperf3">iperf3 (ネットワーク帯域幅測定)</option>
+          <option value="metasploit">Metasploit (エクスプロイトフレームワーク)</option>
+        </select>
+      </div>
 
-        <!-- ターゲット -->
-        <div>
-          <label class="opt-label" for="target">🎯 スキャン対象 (target)</label>
-          <input type="text" id="target" value="192.168.1.1" placeholder="例: 192.168.1.0/24" />
-        </div>
+      <div class="options-body flex-1 overflow-y-auto">
 
-        <!-- スキャン種別 -->
-        <div>
-          <label class="opt-label" for="scanType">🔍 スキャン種別</label>
-          <select id="scanType">
-            <option value="-sV">-sV　バージョン検出</option>
-            <option value="-sS">-sS　SYNスキャン（ステルス）</option>
-            <option value="-sT">-sT　TCPコネクトスキャン</option>
-            <option value="-sU">-sU　UDPスキャン</option>
-            <option value="-sn">-sn　Pingスキャン（ポートスキャンなし）</option>
-            <option value="-A">-A　総合スキャン（OS/バージョン/スクリプト）</option>
-          </select>
-        </div>
+        <!-- nmapオプションコンテナ -->
+        <div id="nmapOptionsContainer" class="flex flex-col gap-5">
 
-        <!-- タイミング -->
-        <div>
-          <label class="opt-label" for="timing">⏱ タイミングテンプレート</label>
-          <select id="timing">
-            <option value="-T1">-T1　非常に遅い（IDS回避）</option>
-            <option value="-T2">-T2　遅い</option>
-            <option value="-T3" selected>-T3　標準（デフォルト）</option>
-            <option value="-T4">-T4　速い</option>
-            <option value="-T5">-T5　超高速</option>
-          </select>
-        </div>
-
-        <!-- ポート範囲 -->
-        <div>
-          <label class="opt-label" for="portRange">🔌 ポート範囲 (空白=デフォルト1000)</label>
-          <input type="text" id="portRange" placeholder="例: 80,443 または 1-1024" />
-        </div>
-
-        <!-- 追加オプション（チェックボックス）-->
-        <div>
-          <label class="opt-label">📋 追加オプション</label>
-          <div class="checkbox-group">
-            <label class="checkbox-item">
-              <input type="checkbox" id="osDetect" />
-              <span>-O</span>
-              <span class="badge">OS検出</span>
+          <!-- ターゲット -->
+          <div>
+            <label class="opt-label group relative flex items-center gap-1 w-max" for="target">
+              🎯 スキャン対象 (target)
+              <svg class="w-3 h-3 text-gray-500 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+              <div class="hidden group-hover:block absolute left-0 top-full mt-1 w-48 p-2 bg-gray-800 text-white text-xs rounded z-50 border border-gray-600 shadow-lg font-normal normal-case">
+                スキャン対象のIPアドレス、ネットワーク、またはドメインを入力します。
+              </div>
             </label>
-            <label class="checkbox-item">
-              <input type="checkbox" id="verbose" />
-              <span>-v</span>
-              <span class="badge">詳細出力</span>
+            <input type="text" id="target" value="192.168.1.1" placeholder="例: 192.168.1.0/24" />
+          </div>
+
+          <!-- スキャン種別 -->
+          <div>
+            <label class="opt-label group relative flex items-center gap-1 w-max" for="scanType">
+              🔍 スキャン種別
+              <svg class="w-3 h-3 text-gray-500 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+              <div class="hidden group-hover:block absolute left-0 top-full mt-1 w-48 p-2 bg-gray-800 text-white text-xs rounded z-50 border border-gray-600 shadow-lg font-normal normal-case">
+                ポートの探索方法（TCP接続、SYN、UDPなど）を選択します。
+              </div>
             </label>
+            <select id="scanType">
+              <option value="-sV">-sV　バージョン検出</option>
+              <option value="-sS">-sS　SYNスキャン（ステルス）</option>
+              <option value="-sT">-sT　TCPコネクトスキャン</option>
+              <option value="-sU">-sU　UDPスキャン</option>
+              <option value="-sn">-sn　Pingスキャン（ポートスキャンなし）</option>
+              <option value="-A">-A　総合スキャン（OS/バージョン/スクリプト）</option>
+            </select>
+          </div>
+
+          <!-- タイミング -->
+          <div>
+            <label class="opt-label group relative flex items-center gap-1 w-max" for="timing">
+              ⏱ タイミングテンプレート
+              <svg class="w-3 h-3 text-gray-500 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+              <div class="hidden group-hover:block absolute left-0 top-full mt-1 w-48 p-2 bg-gray-800 text-white text-xs rounded z-50 border border-gray-600 shadow-lg font-normal normal-case">
+                スキャン速度を調整します。速いほど見つかりやすく（またはパケットロスしやすく）なります。
+              </div>
+            </label>
+            <select id="timing">
+              <option value="-T1">-T1　非常に遅い（IDS回避）</option>
+              <option value="-T2">-T2　遅い</option>
+              <option value="-T3" selected>-T3　標準（デフォルト）</option>
+              <option value="-T4">-T4　速い</option>
+              <option value="-T5">-T5　超高速</option>
+            </select>
+          </div>
+
+          <!-- ポート範囲 -->
+          <div>
+            <label class="opt-label group relative flex items-center gap-1 w-max" for="portRange">
+              🔌 ポート範囲
+              <svg class="w-3 h-3 text-gray-500 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+              <div class="hidden group-hover:block absolute left-0 top-full mt-1 w-48 p-2 bg-gray-800 text-white text-xs rounded z-50 border border-gray-600 shadow-lg font-normal normal-case">
+                スキャンするポートを指定します。空白の場合は主要な1000ポートをスキャンします。
+              </div>
+            </label>
+            <input type="text" id="portRange" placeholder="例: 80,443 または 1-1024" />
+          </div>
+
+          <!-- 追加オプション（チェックボックス）-->
+          <div>
+            <label class="opt-label group relative flex items-center gap-1 w-max">
+              📋 追加オプション
+              <svg class="w-3 h-3 text-gray-500 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+              <div class="hidden group-hover:block absolute left-0 top-full mt-1 w-48 p-2 bg-gray-800 text-white text-xs rounded z-50 border border-gray-600 shadow-lg font-normal normal-case">
+                その他のフラグを指定します。
+              </div>
+            </label>
+            <div class="checkbox-group">
+              <label class="checkbox-item">
+                <input type="checkbox" id="osDetect" />
+                <span>-O</span>
+                <span class="badge">OS検出</span>
+              </label>
+              <label class="checkbox-item">
+                <input type="checkbox" id="verbose" />
+                <span>-v</span>
+                <span class="badge">詳細出力</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- gobusterオプションコンテナ -->
+        <div id="gobusterOptionsContainer" class="hidden flex-col gap-5">
+          <!-- ターゲットURL -->
+          <div>
+            <label class="opt-label group relative flex items-center gap-1 w-max" for="gbTarget">
+              🌐 対象URL (url)
+              <svg class="w-3 h-3 text-gray-500 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+              <div class="hidden group-hover:block absolute left-0 top-full mt-1 w-48 p-2 bg-gray-800 text-white text-xs rounded z-50 border border-gray-600 shadow-lg font-normal normal-case">
+                探索対象のベースURLを指定します。
+              </div>
+            </label>
+            <input type="text" id="gbTarget" value="http://192.168.1.1/" placeholder="例: http://example.com/" />
+          </div>
+
+          <!-- 探索モード -->
+          <div>
+            <label class="opt-label group relative flex items-center gap-1 w-max" for="gbMode">
+              🛠 探索モード
+              <svg class="w-3 h-3 text-gray-500 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+              <div class="hidden group-hover:block absolute left-0 top-full mt-1 w-48 p-2 bg-gray-800 text-white text-xs rounded z-50 border border-gray-600 shadow-lg font-normal normal-case">
+                dir (ディレクトリ・ファイル探索), dns (サブドメイン探索) などを選びます。
+              </div>
+            </label>
+            <select id="gbMode">
+              <option value="dir">dir (ディレクトリ/ファイル)</option>
+              <option value="dns">dns (サブドメイン)</option>
+              <option value="vhost">vhost (バーチャルホスト)</option>
+            </select>
+          </div>
+
+          <!-- ワードリスト -->
+          <div>
+            <label class="opt-label group relative flex items-center gap-1 w-max" for="gbWordlist">
+              📖 ワードリスト (-w)
+              <svg class="w-3 h-3 text-gray-500 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+              <div class="hidden group-hover:block absolute left-0 top-full mt-1 w-48 p-2 bg-gray-800 text-white text-xs rounded z-50 border border-gray-600 shadow-lg font-normal normal-case">
+                探索に使用する辞書ファイル（ワードリスト）を指定します。
+              </div>
+            </label>
+            <select id="gbWordlist">
+              <option value="/usr/share/wordlists/dirb/common.txt">common.txt (Dirb default)</option>
+              <option value="/usr/share/wordlists/dirbuster/directory-list-2.3-small.txt">directory-list-2.3-small.txt</option>
+            </select>
+          </div>
+          
+          <!-- 追加オプション -->
+          <div>
+            <label class="opt-label group relative flex items-center gap-1 w-max">
+              📋 追加オプション
+              <svg class="w-3 h-3 text-gray-500 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+              <div class="hidden group-hover:block absolute left-0 top-full mt-1 w-48 p-2 bg-gray-800 text-white text-xs rounded z-50 border border-gray-600 shadow-lg font-normal normal-case">
+                その他のフラグを指定します。
+              </div>
+            </label>
+            <div class="checkbox-group">
+              <label class="checkbox-item group relative w-max">
+                <input type="checkbox" id="gbQuiet" />
+                <span>-q</span>
+                <span class="badge">Quiet</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- curlオプションコンテナ -->
+        <div id="curlOptionsContainer" class="hidden flex-col gap-5">
+          <!-- ターゲットURL -->
+          <div>
+            <label class="opt-label group relative flex items-center gap-1 w-max" for="curlTarget">
+              🌐 対象URL (url)
+              <svg class="w-3 h-3 text-gray-500 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+              <div class="hidden group-hover:block absolute left-0 top-full mt-1 w-48 p-2 bg-gray-800 text-white text-xs rounded z-50 border border-gray-600 shadow-lg font-normal normal-case">
+                リクエストを送信する対象のURLを指定します。
+              </div>
+            </label>
+            <input type="text" id="curlTarget" value="http://192.168.1.1/" placeholder="例: http://example.com/" />
+          </div>
+
+          <!-- HTTPメソッド -->
+          <div>
+            <label class="opt-label group relative flex items-center gap-1 w-max" for="curlMethod">
+              🛠 HTTPメソッド (-X)
+              <svg class="w-3 h-3 text-gray-500 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+              <div class="hidden group-hover:block absolute left-0 top-full mt-1 w-48 p-2 bg-gray-800 text-white text-xs rounded z-50 border border-gray-600 shadow-lg font-normal normal-case">
+                リクエストに使用するHTTPメソッドを選択します。
+              </div>
+            </label>
+            <select id="curlMethod">
+              <option value="GET">GET</option>
+              <option value="POST">POST</option>
+              <option value="PUT">PUT</option>
+              <option value="DELETE">DELETE</option>
+              <option value="HEAD">HEAD</option>
+              <option value="OPTIONS">OPTIONS</option>
+            </select>
+          </div>
+
+          <!-- ヘッダー追加 -->
+          <div>
+            <label class="opt-label group relative flex items-center gap-1 w-max" for="curlHeader">
+              📝 ヘッダー追加 (-H)
+              <svg class="w-3 h-3 text-gray-500 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+              <div class="hidden group-hover:block absolute left-0 top-full mt-1 w-48 p-2 bg-gray-800 text-white text-xs rounded z-50 border border-gray-600 shadow-lg font-normal normal-case">
+                リクエストに追加するヘッダーを指定します。
+              </div>
+            </label>
+            <input type="text" id="curlHeader" placeholder="例: Content-Type: application/json" />
+          </div>
+          
+          <!-- 追加オプション -->
+          <div>
+            <label class="opt-label group relative flex items-center gap-1 w-max">
+              📋 追加オプション
+              <svg class="w-3 h-3 text-gray-500 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+              <div class="hidden group-hover:block absolute left-0 top-full mt-1 w-48 p-2 bg-gray-800 text-white text-xs rounded z-50 border border-gray-600 shadow-lg font-normal normal-case">
+                その他のフラグを指定します。
+              </div>
+            </label>
+            <div class="checkbox-group">
+              <label class="checkbox-item group relative w-max">
+                <input type="checkbox" id="curlVerbose" />
+                <span>-v</span>
+                <span class="badge">Verbose</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- hydraオプションコンテナ -->
+        <div id="hydraOptionsContainer" class="hidden flex-col gap-5">
+          <div class="text-xs text-blue-400 bg-blue-900/30 p-3 rounded border border-blue-800 mb-2">
+            ℹ️ オンラインでのブルートフォース/辞書攻撃を検証します。
+          </div>
+          <div>
+            <label class="opt-label group relative flex items-center gap-1 w-max" for="hydraTarget">
+              🎯 ターゲット (IP/URL)
+            </label>
+            <input type="text" id="hydraTarget" value="127.0.0.1" placeholder="例: 127.0.0.1" />
+          </div>
+          <div>
+            <label class="opt-label group relative flex items-center gap-1 w-max" for="hydraService">
+              🔌 対象サービス
+            </label>
+            <select id="hydraService">
+              <option value="ssh">ssh</option>
+              <option value="ftp">ftp</option>
+              <option value="http-get">http-get</option>
+            </select>
+          </div>
+          <div>
+            <label class="opt-label group relative flex items-center gap-1 w-max" for="hydraUser">
+              👤 ユーザー名 (-l / -L)
+            </label>
+            <input type="text" id="hydraUser" value="admin" placeholder="例: admin" />
+          </div>
+          <div>
+            <label class="opt-label group relative flex items-center gap-1 w-max" for="hydraWordlist">
+              📖 パスワード辞書 (-P)
+            </label>
+            <select id="hydraWordlist">
+              <option value="/usr/share/wordlists/passwords.txt">passwords.txt</option>
+            </select>
+          </div>
+          <div>
+            <div class="checkbox-group">
+              <label class="checkbox-item group relative w-max">
+                <input type="checkbox" id="hydraUserList" />
+                <span>-L</span>
+                <span class="badge">ユーザーリストとして扱う</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- aircrack-ngオプションコンテナ -->
+        <div id="aircrackOptionsContainer" class="hidden flex-col gap-5">
+          <div class="text-xs text-purple-400 bg-purple-900/30 p-3 rounded border border-purple-800 mb-2">
+            ℹ️ パケットキャプチャ（airodump-ng）で取得した暗号鍵データに対する、オフライン辞書攻撃を検証します。
+          </div>
+          <div>
+            <label class="opt-label group relative flex items-center gap-1 w-max" for="aircrackTarget">
+              📁 ターゲットファイル (.cap/.ivs)
+            </label>
+            <input type="text" id="aircrackTarget" value="/usr/share/wordlists/wpa.cap" placeholder="例: /usr/share/wordlists/wpa.cap" />
+          </div>
+          <div>
+            <label class="opt-label group relative flex items-center gap-1 w-max" for="aircrackWordlist">
+              📖 パスワード辞書 (-w)
+            </label>
+            <select id="aircrackWordlist">
+              <option value="/usr/share/wordlists/passwords.txt">passwords.txt</option>
+            </select>
+          </div>
+          <div>
+            <label class="opt-label group relative flex items-center gap-1 w-max" for="aircrackBssid">
+              📡 対象BSSID (-b)
+            </label>
+            <input type="text" id="aircrackBssid" placeholder="例: AA:BB:CC:DD:EE:FF" />
+          </div>
+        </div>
+
+        <!-- iperf3オプションコンテナ -->
+        <div id="iperf3OptionsContainer" class="hidden flex-col gap-5">
+          <div class="text-xs text-green-400 bg-green-900/30 p-3 rounded border border-green-800 mb-2">
+            ℹ️ iperf3を使用してネットワークの帯域幅を測定します。バックグラウンドでiperf3-serverが常時稼働しています。
+          </div>
+          <div>
+            <label class="opt-label group relative flex items-center gap-1 w-max" for="iperf3Target">
+              🎯 ターゲットサーバー (-c)
+            </label>
+            <input type="text" id="iperf3Target" value="iperf3-server" placeholder="例: iperf3-server" />
+          </div>
+          <div>
+            <label class="opt-label group relative flex items-center gap-1 w-max" for="iperf3Protocol">
+              🔌 プロトコル
+            </label>
+            <select id="iperf3Protocol">
+              <option value="tcp">TCP</option>
+              <option value="udp">UDP (-u)</option>
+            </select>
+          </div>
+          <div>
+            <label class="opt-label group relative flex items-center gap-1 w-max" for="iperf3Time">
+              ⏱ 実行時間 (-t)
+            </label>
+            <input type="number" id="iperf3Time" value="10" placeholder="秒数を入力 (例: 10)" />
+          </div>
+          <div>
+            <label class="opt-label group relative flex items-center gap-1 w-max" for="iperf3Bandwidth">
+              📶 帯域幅指定 (-b)
+            </label>
+            <input type="text" id="iperf3Bandwidth" placeholder="例: 10M, 1G (空欄は無制限)" />
+          </div>
+        </div>
+
+        <!-- metasploitオプションコンテナ -->
+        <div id="metasploitOptionsContainer" class="hidden flex-col gap-5">
+          <div class="text-xs text-red-400 bg-red-900/30 p-3 rounded border border-red-800 mb-2">
+            ℹ️ Metasploit（非対話型）を利用して、選択したモジュールを実行します。
+          </div>
+          <div>
+            <label class="opt-label group relative flex items-center gap-1 w-max" for="msfModule">
+              🔫 モジュール選択 (use)
+            </label>
+            <select id="msfModule">
+              <option value="auxiliary/scanner/portscan/tcp">auxiliary/scanner/portscan/tcp</option>
+              <option value="auxiliary/scanner/smb/smb_version">auxiliary/scanner/smb/smb_version</option>
+              <option value="exploit/unix/ftp/vsftpd_234_backdoor">exploit/unix/ftp/vsftpd_234_backdoor</option>
+            </select>
+          </div>
+          <div>
+            <label class="opt-label group relative flex items-center gap-1 w-max" for="msfRhosts">
+              🎯 ターゲット (RHOSTS)
+            </label>
+            <input type="text" id="msfRhosts" value="192.168.1.1" placeholder="例: 192.168.1.1" />
+          </div>
+          <div>
+            <label class="opt-label group relative flex items-center gap-1 w-max" for="msfRport">
+              🔌 対象ポート (RPORT)
+            </label>
+            <input type="text" id="msfRport" placeholder="例: 21, 80, 445 (空欄でデフォルト)" />
           </div>
         </div>
 
@@ -323,7 +642,8 @@
           <div class="traffic-light tl-red"></div>
           <div class="traffic-light tl-yellow"></div>
           <div class="traffic-light tl-green"></div>
-          <span class="terminal-title">sandbox@docker ~ — nmap</span>
+          <span class="terminal-title">sandbox@docker ~ — <span id="termToolName">nmap</span></span>
+          <button onclick="clearTerminal()" class="ml-auto text-xs text-gray-400 hover:text-white bg-gray-800 px-2 py-1 rounded border border-gray-600 transition-colors">Clear</button>
         </div>
         <div class="terminal-body" id="terminalBody">
           <div class="term-info">オプションを選択して「実行する」ボタンを押してください。</div>
@@ -333,9 +653,20 @@
 
       <!-- AI解説エリア -->
       <div class="ai-pane">
-        <div class="ai-header">
-          <span class="ai-badge">AI</span>
-          コマンド解説
+        <div class="ai-header" style="justify-content: space-between;">
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <span class="ai-badge">AI</span>
+            コマンド解説
+          </div>
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <span style="font-size: 0.7rem; color: var(--muted);">Lesson Progress:</span>
+            <select id="currentStep" style="width: auto; padding: 2px 6px; font-size: 0.75rem; background: var(--bg); border: 1px solid var(--border); color: var(--accent); border-radius: 4px; outline: none; cursor: pointer;">
+              <option value="Step 1">Step 1. 情報収集 (Nmap等)</option>
+              <option value="Step 2">Step 2. 脆弱性スキャン</option>
+              <option value="Step 3">Step 3. エクスプロイト</option>
+              <option value="Step 4">Step 4. ポストエクスプロイト</option>
+            </select>
+          </div>
         </div>
         <div class="ai-body" id="aiBody">
           <p class="ai-placeholder">コマンドを実行すると、各オプションの意味をここに解説します。<br>（AI連携機能は後続バージョンで実装予定）</p>
@@ -348,36 +679,178 @@
     const API_BASE = "http://localhost:8000";
 
     // ─── コマンドプレビューのリアルタイム更新 ───
-    const fields = ["target", "scanType", "timing", "portRange", "osDetect", "verbose"];
-    fields.forEach(id => {
+    const nmapFields = ["target", "scanType", "timing", "portRange", "osDetect", "verbose"];
+    const gobusterFields = ["gbTarget", "gbMode", "gbWordlist", "gbQuiet"];
+    const curlFields = ["curlTarget", "curlMethod", "curlHeader", "curlVerbose"];
+    const hydraFields = ["hydraTarget", "hydraService", "hydraUser", "hydraWordlist", "hydraUserList"];
+    const aircrackFields = ["aircrackTarget", "aircrackWordlist", "aircrackBssid"];
+    const iperf3Fields = ["iperf3Target", "iperf3Protocol", "iperf3Time", "iperf3Bandwidth"];
+    const msfFields = ["msfModule", "msfRhosts", "msfRport"];
+    [...nmapFields, ...gobusterFields, ...curlFields, ...hydraFields, ...aircrackFields, ...iperf3Fields, ...msfFields].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.addEventListener("change", updatePreview);
       if (el) el.addEventListener("input", updatePreview);
     });
 
+    function switchTool() {
+      const tool = document.getElementById("toolSelector").value;
+      const containers = {
+          "nmap": document.getElementById("nmapOptionsContainer"),
+          "gobuster": document.getElementById("gobusterOptionsContainer"),
+          "curl": document.getElementById("curlOptionsContainer"),
+          "hydra": document.getElementById("hydraOptionsContainer"),
+          "aircrack-ng": document.getElementById("aircrackOptionsContainer"),
+          "iperf3": document.getElementById("iperf3OptionsContainer"),
+          "metasploit": document.getElementById("metasploitOptionsContainer")
+      };
+
+      for (const [key, container] of Object.entries(containers)) {
+          if (key === tool) {
+              container.classList.remove("hidden");
+              container.classList.add("flex");
+          } else {
+              container.classList.add("hidden");
+              container.classList.remove("flex");
+          }
+      }
+      document.getElementById("termToolName").textContent = tool;
+      updatePreview();
+    }
+
     function buildCommandParts() {
-      const target   = document.getElementById("target").value.trim() || "TARGET";
-      const scanType = document.getElementById("scanType").value;
-      const timing   = document.getElementById("timing").value;
-      const portRange= document.getElementById("portRange").value.trim();
-      const osDetect = document.getElementById("osDetect").checked;
-      const verbose  = document.getElementById("verbose").checked;
+      const tool = document.getElementById("toolSelector").value;
+      if (tool === "nmap") {
+          const target   = document.getElementById("target").value.trim() || "TARGET";
+          const scanType = document.getElementById("scanType").value;
+          const timing   = document.getElementById("timing").value;
+          const portRange= document.getElementById("portRange").value.trim();
+          const osDetect = document.getElementById("osDetect").checked;
+          const verbose  = document.getElementById("verbose").checked;
 
-      const flags = [scanType, timing];
-      if (osDetect) flags.push("-O");
-      if (verbose)  flags.push("-v");
-      if (portRange) flags.push("-p", portRange);
+          const flags = [scanType, timing];
+          if (osDetect) flags.push("-O");
+          if (verbose)  flags.push("-v");
+          if (portRange) flags.push("-p", portRange);
 
-      return { target, flags };
+          return { tool, target, flags };
+      } else if (tool === "gobuster") {
+          const target = document.getElementById("gbTarget").value.trim() || "URL";
+          const mode = document.getElementById("gbMode").value;
+          const wordlist = document.getElementById("gbWordlist").value;
+          const quiet = document.getElementById("gbQuiet").checked;
+          
+          const flags = [mode, "-u", target, "-w", wordlist];
+          if (quiet) flags.push("-q");
+          return { tool, target, flags };
+      } else if (tool === "curl") {
+          const target = document.getElementById("curlTarget").value.trim() || "URL";
+          const method = document.getElementById("curlMethod").value;
+          const header = document.getElementById("curlHeader").value.trim();
+          const verbose = document.getElementById("curlVerbose").checked;
+          
+          const flags = [];
+          if (method !== "GET") flags.push("-X", method);
+          if (header) flags.push("-H", `"${header}"`);
+          if (verbose) flags.push("-v");
+          
+          return { tool, target, flags };
+      } else if (tool === "hydra") {
+          const target = document.getElementById("hydraTarget").value.trim() || "127.0.0.1";
+          const service = document.getElementById("hydraService").value;
+          const user = document.getElementById("hydraUser").value.trim() || "admin";
+          const isUserList = document.getElementById("hydraUserList").checked;
+          const wordlist = document.getElementById("hydraWordlist").value;
+          
+          const flags = [];
+          if (isUserList) flags.push("-L", user);
+          else flags.push("-l", user);
+          
+          flags.push("-P", wordlist);
+          flags.push(target, service);
+          return { tool, target, flags };
+      } else if (tool === "aircrack-ng") {
+          const target = document.getElementById("aircrackTarget").value.trim() || "/usr/share/wordlists/wpa.cap";
+          const wordlist = document.getElementById("aircrackWordlist").value;
+          const bssid = document.getElementById("aircrackBssid").value.trim();
+          
+          const flags = ["-w", wordlist];
+          if (bssid) flags.push("-b", bssid);
+          flags.push(target);
+          return { tool, target, flags };
+      } else if (tool === "iperf3") {
+          const target = document.getElementById("iperf3Target").value.trim() || "iperf3-server";
+          const protocol = document.getElementById("iperf3Protocol").value;
+          const time = document.getElementById("iperf3Time").value;
+          const bandwidth = document.getElementById("iperf3Bandwidth").value.trim();
+          
+          const flags = ["-c", target];
+          if (protocol === "udp") flags.push("-u");
+          if (time) flags.push("-t", time);
+          if (bandwidth) flags.push("-b", bandwidth);
+          return { tool, target, flags };
+      } else if (tool === "metasploit") {
+          const module = document.getElementById("msfModule").value;
+          const rhosts = document.getElementById("msfRhosts").value.trim() || "127.0.0.1";
+          const rport = document.getElementById("msfRport").value.trim();
+          
+          let script = `use ${module}; set RHOSTS ${rhosts}; `;
+          if (rport) script += `set RPORT ${rport}; `;
+          script += "run; exit";
+          
+          const flags = ["-q", "-x", `"${script}"`];
+          return { tool, target: rhosts, flags };
+      }
     }
 
     function updatePreview() {
-      const { target, flags } = buildCommandParts();
+      const { tool, target, flags } = buildCommandParts();
       const preview = document.getElementById("cmdPreview");
-      preview.innerHTML =
-        `<span class="cmd-name">nmap</span>` +
-        flags.map(f => `<span class="cmd-flag"> ${f}</span>`).join("") +
-        `<span class="cmd-target"> ${target}</span>`;
+      
+      if (tool === "nmap") {
+          preview.innerHTML =
+            `<span class="cmd-name">nmap</span>` +
+            flags.map(f => `<span class="cmd-flag"> ${f}</span>`).join("") +
+            `<span class="cmd-target"> ${target}</span>`;
+      } else if (tool === "gobuster") {
+          preview.innerHTML =
+            `<span class="cmd-name">gobuster</span>` +
+            flags.map(f => {
+                if (f === target) return `<span class="cmd-target"> ${f}</span>`;
+                return `<span class="cmd-flag"> ${f}</span>`;
+            }).join("");
+      } else if (tool === "curl") {
+          preview.innerHTML =
+            `<span class="cmd-name">curl</span>` +
+            flags.map(f => `<span class="cmd-flag"> ${f}</span>`).join("") +
+            `<span class="cmd-target"> ${target}</span>`;
+      } else if (tool === "hydra") {
+          preview.innerHTML =
+            `<span class="cmd-name">hydra</span>` +
+            flags.map(f => {
+                if (f === target) return `<span class="cmd-target"> ${f}</span>`;
+                return `<span class="cmd-flag"> ${f}</span>`;
+            }).join("");
+      } else if (tool === "aircrack-ng") {
+          preview.innerHTML =
+            `<span class="cmd-name">aircrack-ng</span>` +
+            flags.map(f => {
+                if (f === target) return `<span class="cmd-target"> ${f}</span>`;
+                return `<span class="cmd-flag"> ${f}</span>`;
+            }).join("");
+      } else if (tool === "iperf3") {
+          preview.innerHTML =
+            `<span class="cmd-name">iperf3</span>` +
+            flags.map(f => {
+                if (f === target) return `<span class="cmd-target"> ${f}</span>`;
+                return `<span class="cmd-flag"> ${f}</span>`;
+            }).join("");
+      } else if (tool === "metasploit") {
+          preview.innerHTML =
+            `<span class="cmd-name">msfconsole</span>` +
+            flags.map(f => {
+                return `<span class="cmd-flag"> ${escapeHtml(f)}</span>`;
+            }).join("");
+      }
     }
 
     // ─── バックエンド疎通確認 ───
@@ -411,22 +884,52 @@
       document.getElementById("terminalBody").innerHTML = "";
     }
 
+    function setFormDisabled(disabled) {
+      document.querySelectorAll(".left-panel input, .left-panel select, .left-panel button").forEach(el => {
+        el.disabled = disabled;
+        if (disabled) el.classList.add("opacity-50", "cursor-not-allowed");
+        else el.classList.remove("opacity-50", "cursor-not-allowed");
+      });
+    }
+
     // ─── コマンド実行 ───
     async function runCommand() {
-      const target   = document.getElementById("target").value.trim();
-      if (!target) { alert("スキャン対象を入力してください"); return; }
-
-      const scanType = document.getElementById("scanType").value;
-      const timing   = document.getElementById("timing").value;
-      const portRange= document.getElementById("portRange").value.trim();
-      const osDetect = document.getElementById("osDetect").checked;
-      const verbose  = document.getElementById("verbose").checked;
+      const tool = document.getElementById("toolSelector").value;
+      let target;
+      if (tool === "nmap") {
+          target = document.getElementById("target").value.trim();
+          if (!target) { alert("スキャン対象を入力してください"); return; }
+      } else if (tool === "gobuster") {
+          target = document.getElementById("gbTarget").value.trim();
+          if (!target) { alert("対象URLを入力してください"); return; }
+      } else if (tool === "curl") {
+          target = document.getElementById("curlTarget").value.trim();
+          if (!target) { alert("対象URLを入力してください"); return; }
+      } else if (tool === "hydra") {
+          target = document.getElementById("hydraTarget").value.trim();
+          if (!target) { alert("ターゲットを入力してください"); return; }
+      } else if (tool === "aircrack-ng") {
+          target = document.getElementById("aircrackTarget").value.trim();
+          if (!target) { alert("ターゲットファイルを入力してください"); return; }
+      } else if (tool === "iperf3") {
+          target = document.getElementById("iperf3Target").value.trim();
+          if (!target) { alert("ターゲットを入力してください"); return; }
+      } else if (tool === "metasploit") {
+          target = document.getElementById("msfRhosts").value.trim();
+          if (!target) { alert("ターゲットを入力してください"); return; }
+      }
 
       const { flags } = buildCommandParts();
-      const cmdStr = `nmap ${flags.join(" ")} ${target}`;
+      let cmdStr;
+      if (tool === "nmap") cmdStr = `nmap ${flags.join(" ")} ${target}`;
+      else if (tool === "gobuster") cmdStr = `gobuster ${flags.join(" ")}`;
+      else if (tool === "curl") cmdStr = `curl ${flags.join(" ")} ${target}`;
+      else if (tool === "hydra") cmdStr = `hydra ${flags.join(" ")}`;
+      else if (tool === "aircrack-ng") cmdStr = `aircrack-ng ${flags.join(" ")}`;
+      else if (tool === "iperf3") cmdStr = `iperf3 ${flags.join(" ")}`;
+      else if (tool === "metasploit") cmdStr = `msfconsole ${flags.join(" ")}`;
 
-      const btn = document.getElementById("runBtn");
-      btn.disabled = true;
+      setFormDisabled(true);
 
       clearTerminal();
       appendTerminal(`<span class="term-prompt">student@sandbox:~$</span> <span class="term-cmd">${cmdStr}</span>`);
@@ -439,8 +942,8 @@
         await new Promise(r => setTimeout(r, 1200));
         document.getElementById("terminalBody").lastChild.remove();
         appendTerminal(`<div class="term-success">✓ 生成コマンド: ${cmdStr}</div>`);
-        showAiExplanation(cmdStr, flags);
-        btn.disabled = false;
+        showAiExplanation(cmdStr, flags, tool);
+        setFormDisabled(false);
         return;
       }
 
@@ -448,16 +951,80 @@
       appendTerminal(`<div class="loading-dots" id="loading"><span>.</span><span>.</span><span>.</span></div>`);
 
       try {
-        const payload = {
-          tool: "nmap",
-          options: {
-            target,
-            scan_type: scanType,
-            os_detection: osDetect,
-            timing,
-            port_range: portRange || null,
-          }
-        };
+        let payload;
+        if (tool === "nmap") {
+            payload = {
+              tool: "nmap",
+              options: {
+                target,
+                scan_type: document.getElementById("scanType").value,
+                os_detection: document.getElementById("osDetect").checked,
+                timing: document.getElementById("timing").value,
+                port_range: document.getElementById("portRange").value.trim() || null,
+              }
+            };
+        } else if (tool === "gobuster") {
+            payload = {
+              tool: "gobuster",
+              options: {
+                target,
+                mode: document.getElementById("gbMode").value,
+                wordlist: document.getElementById("gbWordlist").value,
+                quiet: document.getElementById("gbQuiet").checked,
+              }
+            };
+        } else if (tool === "curl") {
+            payload = {
+              tool: "curl",
+              options: {
+                target,
+                method: document.getElementById("curlMethod").value,
+                header: document.getElementById("curlHeader").value.trim() || null,
+                verbose: document.getElementById("curlVerbose").checked,
+              }
+            };
+        } else if (tool === "hydra") {
+            payload = {
+              tool: "hydra",
+              options: {
+                target,
+                service: document.getElementById("hydraService").value,
+                user: document.getElementById("hydraUser").value.trim(),
+                user_list: document.getElementById("hydraUserList").checked,
+                wordlist: document.getElementById("hydraWordlist").value,
+              }
+            };
+        } else if (tool === "aircrack-ng") {
+            payload = {
+              tool: "aircrack-ng",
+              options: {
+                target_file: target,
+                wordlist: document.getElementById("aircrackWordlist").value,
+                bssid: document.getElementById("aircrackBssid").value.trim() || null,
+              }
+            };
+        } else if (tool === "iperf3") {
+            payload = {
+              tool: "iperf3",
+              options: {
+                target,
+                protocol: document.getElementById("iperf3Protocol").value,
+                time: parseInt(document.getElementById("iperf3Time").value) || 10,
+                bandwidth: document.getElementById("iperf3Bandwidth").value.trim() || null,
+              }
+            };
+        } else if (tool === "metasploit") {
+            payload = {
+              tool: "metasploit",
+              options: {
+                module: document.getElementById("msfModule").value,
+                rhosts: target,
+                rport: document.getElementById("msfRport").value.trim() || null,
+              }
+            };
+        }
+
+        payload.current_step = document.getElementById("currentStep").value;
 
         const res = await fetch(`${API_BASE}/api/execute`, {
           method: "POST",
@@ -480,14 +1047,18 @@
           } else {
             appendTerminal(`<div class="term-error">✗ 終了コード: ${data.exit_code}</div>`);
           }
-          showAiExplanation(data.command, flags);
+          if (data.ai_explanation) {
+            document.getElementById("aiBody").innerHTML = `<p>${escapeHtml(data.ai_explanation).replace(/\n/g, "<br>")}</p>`;
+          } else {
+            showAiExplanation(data.command, flags, tool);
+          }
         }
       } catch (e) {
         document.getElementById("loading")?.remove();
         appendTerminal(`<div class="term-error">通信エラー: ${e.message}</div>`);
       }
 
-      btn.disabled = false;
+      setFormDisabled(false);
     }
 
     function escapeHtml(s) {
@@ -495,7 +1066,7 @@
     }
 
     // ─── AI解説（ダミー実装） ───
-    function showAiExplanation(cmdStr, flags) {
+    function showAiExplanation(cmdStr, flags, tool="nmap") {
       const explanations = {
         "-sV": "<code>-sV</code>（バージョン検出）: 開いているポートで動作しているサービスとそのバージョンを検出します。",
         "-sS": "<code>-sS</code>（SYNスキャン）: TCP SYNパケットだけを送る「ステルス」スキャン。完全な接続を確立せず、ログに残りにくい。",
@@ -507,6 +1078,20 @@
         "-T1": "<code>-T1</code>（非常に遅い）: IDS/IDPSによる検出を回避するため、パケット送信間隔を最大化。",
         "-T3": "<code>-T3</code>（標準）: nmapのデフォルト速度。速度と信頼性のバランスが取れている。",
         "-T4": "<code>-T4</code>（高速）: 高速ネットワーク向け。速いが、不安定なネットワークではパケットロスが起きやすい。",
+        "dir": "<code>dir</code>: ディレクトリ・ファイル探索モード。Webサーバー上の隠されたパスを探します。",
+        "dns": "<code>dns</code>: サブドメイン探索モード。対象ドメインに関連するサブドメインを探します。",
+        "vhost": "<code>vhost</code>: バーチャルホスト探索モード。同じIP上の異なるホスト名を探します。",
+        "-u": "<code>-u</code>: ターゲットのURLを指定します。",
+        "-w": "<code>-w</code>: 探索に使用する辞書ファイル（ワードリスト）を指定します。",
+        "-q": "<code>-q</code>: Quietモード。バナーやエラーなどを非表示にし、見つかった結果のみを出力します。",
+        "-X": "<code>-X</code>: 使用するHTTPリクエストメソッド（GET, POSTなど）を指定します。",
+        "-H": "<code>-H</code>: HTTPリクエストヘッダーを追加します。",
+        "-v": "<code>-v</code>: Verbose（詳細）モード。リクエストとレスポンスのヘッダーなど詳細な通信内容を表示します。",
+        "-l": "<code>-l</code>: 単一のユーザー名を指定します。",
+        "-L": "<code>-L</code>: ユーザー名のリスト（辞書）を指定します。",
+        "-P": "<code>-P</code>: パスワード辞書ファイルを指定します。",
+        "-w": "<code>-w</code>: パスワード辞書ファイルを指定します。",
+        "-b": "<code>-b</code>: 対象のBSSID（MACアドレス）を指定します。",
       };
 
       let html = `<p>🔍 <strong>コマンド解析:</strong> <code>${escapeHtml(cmdStr)}</code></p>`;

@@ -1,0 +1,8 @@
+admin
+login
+images
+css
+js
+api
+test
+backup
