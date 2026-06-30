@@ -26,13 +26,14 @@ RESOURCE_LIMITS = {
 }
 
 
-def run_command_in_sandbox(command: list[str], image: str = SANDBOX_IMAGE) -> dict:
+def run_command_in_sandbox(command: list[str], image: str = SANDBOX_IMAGE, network_mode: str = "none") -> dict:
     """
     Dockerコンテナ内でコマンドを実行し、結果を返す。
 
     Args:
         command: 実行するコマンドのリスト（例: ["nmap", "-sV", "target"]）
         image: 使用するDockerイメージ
+        network_mode: 適用するネットワークモード（例: "none", "bridge"）
 
     Returns:
         {
@@ -61,8 +62,8 @@ def run_command_in_sandbox(command: list[str], image: str = SANDBOX_IMAGE) -> di
             mem_limit=mem_limit,
             cpu_period=RESOURCE_LIMITS["cpu_period"],
             cpu_quota=RESOURCE_LIMITS["cpu_quota"],
-            volumes={WORDLISTS_DIR: {"bind": "/usr/share/wordlists", "mode": "ro"}},
-            network_mode=RESOURCE_LIMITS["network_mode"] if "iperf" not in image.lower() and "metasploit" not in image.lower() else "bridge",  # iperf3 & metasploit need network
+            # volumes={WORDLISTS_DIR: {"bind": "/usr/share/wordlists", "mode": "ro"}},
+            network_mode=network_mode, # 引数で受け取ったネットワークモードを適用して外部通信を制御する
         )
 
         stdout = result.decode("utf-8", errors="replace") if result else ""

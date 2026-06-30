@@ -31,18 +31,7 @@
       display: flex;
       flex-direction: column;
     }
-    /* ─── Header ─── */
-    header {
-      background: var(--surface);
-      border-bottom: 1px solid var(--border);
-      padding: 0.75rem 1.5rem;
-      display: flex;
-      align-items: center;
-      gap: 1rem;
-      flex-shrink: 0;
-    }
-    header h1 { font-size: 1.1rem; font-weight: 700; color: var(--accent); letter-spacing: 0.02em; }
-    header span { font-size: 0.75rem; color: var(--muted); background: #21262d; padding: 2px 8px; border-radius: 9999px; border: 1px solid var(--border); }
+    /* ─── Header CSS replaced by Tailwind classes in HTML ─── */
     /* ─── Main layout ─── */
     .workspace {
       display: flex;
@@ -232,10 +221,22 @@
   </style>
 </head>
 <body>
-  <header>
-    <h1>⚡ CUI Learning WebUI</h1>
-    <span>MVP v0.1</span>
-    <span id="backendStatus" style="margin-left:auto;">● Backend: 確認中…</span>
+  <header class="flex flex-col gap-3 bg-[#161b22] border-b border-[#30363d] px-6 py-4 flex-shrink-0">
+    <div class="flex items-center w-full">
+      <h1 class="text-lg font-bold text-[#58a6ff] tracking-wide">⚡ CUI Learning WebUI</h1>
+      <span class="ml-4 text-xs text-[#8b949e] bg-[#21262d] px-2 py-0.5 rounded-full border border-[#30363d]">MVP v0.1</span>
+      <span id="backendStatus" class="ml-auto text-sm text-[#8b949e]">● Backend: 確認中…</span>
+    </div>
+    
+    <!-- PTES Lesson Stepper -->
+    <div class="w-full mt-1">
+      <div class="flex items-center justify-between">
+        <button onclick="setStep('Step 1')" id="btn-step-1" class="step-btn flex-1 pb-2 text-center text-sm font-semibold border-b-2 border-[#58a6ff] text-[#58a6ff] transition-all">Step 1. 情報収集 (Nmap等)</button>
+        <button onclick="setStep('Step 2')" id="btn-step-2" class="step-btn flex-1 pb-2 text-center text-sm font-semibold border-b-2 border-[#30363d] text-[#8b949e] hover:text-[#c9d1d9] transition-all">Step 2. 脆弱性スキャン</button>
+        <button onclick="setStep('Step 3')" id="btn-step-3" class="step-btn flex-1 pb-2 text-center text-sm font-semibold border-b-2 border-[#30363d] text-[#8b949e] hover:text-[#c9d1d9] transition-all">Step 3. エクスプロイト</button>
+        <button onclick="setStep('Step 4')" id="btn-step-4" class="step-btn flex-1 pb-2 text-center text-sm font-semibold border-b-2 border-[#30363d] text-[#8b949e] hover:text-[#c9d1d9] transition-all">Step 4. ポストエクスプロイト</button>
+      </div>
+    </div>
   </header>
 
   <div class="workspace">
@@ -659,13 +660,9 @@
             コマンド解説
           </div>
           <div style="display: flex; align-items: center; gap: 0.5rem;">
-            <span style="font-size: 0.7rem; color: var(--muted);">Lesson Progress:</span>
-            <select id="currentStep" style="width: auto; padding: 2px 6px; font-size: 0.75rem; background: var(--bg); border: 1px solid var(--border); color: var(--accent); border-radius: 4px; outline: none; cursor: pointer;">
-              <option value="Step 1">Step 1. 情報収集 (Nmap等)</option>
-              <option value="Step 2">Step 2. 脆弱性スキャン</option>
-              <option value="Step 3">Step 3. エクスプロイト</option>
-              <option value="Step 4">Step 4. ポストエクスプロイト</option>
-            </select>
+            <span id="aiPaneHeaderStep" style="font-size: 0.75rem; color: var(--accent); font-weight: bold;">Step 1. 情報収集 (Nmap等)</span>
+            <!-- Hidden input to keep compatibility with JS -->
+            <input type="hidden" id="currentStep" value="Step 1" />
           </div>
         </div>
         <div class="ai-body" id="aiBody">
@@ -691,6 +688,48 @@
       if (el) el.addEventListener("change", updatePreview);
       if (el) el.addEventListener("input", updatePreview);
     });
+
+    // ─── ステップ切り替え処理 ───
+    function setStep(stepVal) {
+      document.getElementById("currentStep").value = stepVal;
+      
+      const buttons = [
+        { id: "btn-step-1", val: "Step 1", text: "Step 1. 情報収集 (Nmap等)" },
+        { id: "btn-step-2", val: "Step 2", text: "Step 2. 脆弱性スキャン" },
+        { id: "btn-step-3", val: "Step 3", text: "Step 3. エクスプロイト" },
+        { id: "btn-step-4", val: "Step 4", text: "Step 4. ポストエクスプロイト" }
+      ];
+      
+      let stepThemeColor = "var(--accent)"; // Default blue
+      if (stepVal === "Step 2") stepThemeColor = "#e3b341"; // Yellow
+      else if (stepVal === "Step 3") stepThemeColor = "#f85149"; // Red
+      else if (stepVal === "Step 4") stepThemeColor = "#a371f7"; // Purple
+
+      buttons.forEach(b => {
+        const btn = document.getElementById(b.id);
+        if (b.val === stepVal) {
+          btn.className = `step-btn flex-1 pb-2 text-center text-sm font-semibold border-b-2 transition-all`;
+          btn.style.borderColor = stepThemeColor;
+          btn.style.color = stepThemeColor;
+          document.getElementById("aiPaneHeaderStep").textContent = b.text;
+          document.getElementById("aiPaneHeaderStep").style.color = stepThemeColor;
+          document.querySelector(".ai-badge").style.background = stepThemeColor;
+        } else {
+          btn.className = `step-btn flex-1 pb-2 text-center text-sm font-semibold border-b-2 border-[#30363d] text-[#8b949e] hover:text-[#c9d1d9] transition-all`;
+          btn.style.borderColor = "";
+          btn.style.color = "";
+        }
+      });
+      
+      // ガイダンスとして推奨ツールを自動選択
+      const toolSelector = document.getElementById("toolSelector");
+      if (stepVal === "Step 1") toolSelector.value = "nmap";
+      else if (stepVal === "Step 2") toolSelector.value = "gobuster";
+      else if (stepVal === "Step 3") toolSelector.value = "hydra";
+      else if (stepVal === "Step 4") toolSelector.value = "iperf3";
+      
+      switchTool();
+    }
 
     function switchTool() {
       const tool = document.getElementById("toolSelector").value;

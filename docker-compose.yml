@@ -14,3 +14,13 @@ services:
     ports:
       - "5201:5201"
     container_name: iperf3-server
+
+  dummy-web:
+    image: nginx:latest
+    container_name: dummy-web
+    ports:
+      - "8080:80"
+
+networks:
+  default:
+    name: cui-learning-network
