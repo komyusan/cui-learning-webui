@@ -1,11 +1,13 @@
-version: "3.9"
 services:
   backend:
     build: ./backend
+    env_file:
+      - ../secrets/.env
     ports:
       - "8000:8000"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+      - ./frontend:/frontend   # main.py が ../frontend (=/frontend) を参照するためマウント
     environment:
       - PYTHONUNBUFFERED=1
   iperf3-server:

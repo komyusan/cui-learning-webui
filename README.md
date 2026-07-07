@@ -21,37 +21,51 @@ cui-learning-webui/
 ### フロントエンドのみ（バックエンドなし・デモモード）
 
 ```bash
+# cui-learning-webui/ で実行
 open frontend/index.html
 ```
 バックエンド未接続でも「デモモード」で動作確認できます。
 
 ### バックエンド + フロントエンド（フル動作）
 
-#### 1. 仮想環境の準備
+> **すべて `cui-learning-webui/`（プロジェクトルート）で実行してください。**
+
+#### コピペ用（Docker Compose 推奨）
 
 ```bash
+# 初回 or コード変更後
+docker compose up --build -d backend
+
+# ブラウザで開く（← file:// ではなく http:// で開くこと）
+open http://localhost:8000
+```
+
+#### ローカル実行（Docker Compose を使わない場合）
+
+```bash
+# backend/ に移動してから実行
 cd backend
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-```
-
-#### 2. サンドボックスイメージの取得
-
-```bash
+export OPENAI_API_KEY="sk-..."   # APIキーを設定
 docker pull instrumentisto/nmap:latest
-```
-
-#### 3. バックエンド起動
-
-```bash
 uvicorn main:app --reload --port 8000
 ```
 
-#### 4. ブラウザで開く
-
+```bash
+# 別ターミナルで（プロジェクトルートから）
+open http://localhost:8000
 ```
-open frontend/index.html
+
+> **注意**: `open frontend/index.html` で直接ファイルを開くと「デモモード」になります。
+> バックエンドと繋げるには必ず `http://localhost:8000` でアクセスしてください。
+
+#### ログ監視
+
+```bash
+# cui-learning-webui/ で実行
+docker compose logs backend -f
 ```
 
 API ドキュメント: http://localhost:8000/docs
@@ -63,6 +77,5 @@ API ドキュメント: http://localhost:8000/docs
 - [x] FastAPI `/api/execute` エンドポイント
 - [x] Dockerサンドボックスでの実行（`instrumentisto/nmap`）
 - [x] ターミナル風出力表示
-- [x] AI解説エリア（ダミー実装）
-- [ ] OpenAI API連携による本物の解説（次フェーズ）
+- [x] OpenAI API連携による AI チューター解説（gpt-4o-mini）
 - [ ] 複数ツール対応（gobuster, nikto等）

@@ -27,7 +27,7 @@ from commands import (
     build_curl_command, build_hydra_command, build_aircrack_command,
     build_iperf_command, build_metasploit_command
 )
-from ai_service import build_llm_context, generate_dummy_ai_response
+from ai_service import build_llm_context, generate_ai_response
 
 # ──────────────────────────────────────────────
 # ロギング設定
@@ -199,10 +199,10 @@ async def execute_command(req: ExecuteRequest):
     result = run_command_in_sandbox(command, image=image, network_mode=network_mode)
     exit_code = result["exit_code"]
 
-    # AIコンテキスト生成とダミー解説の取得
+    # AIコンテキスト生成とAI解説の取得
     llm_context_json = build_llm_context(req, command, exit_code)
     logger.info(f"LLM Context: {llm_context_json}")
-    ai_explanation = generate_dummy_ai_response(llm_context_json, req.tool)
+    ai_explanation = generate_ai_response(llm_context_json, req.tool)
 
     return ExecuteResponse(
         command=command_str,
