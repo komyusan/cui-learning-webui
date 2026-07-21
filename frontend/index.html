@@ -278,7 +278,7 @@
                 スキャン対象のIPアドレス、ネットワーク、またはドメインを入力します。
               </div>
             </label>
-            <input type="text" id="target" value="192.168.1.1" placeholder="例: 192.168.1.0/24" />
+            <input type="text" id="target" value="dummy-web" placeholder="例: dummy-web または 192.168.1.0/24" />
           </div>
 
           <!-- スキャン種別 -->
@@ -365,7 +365,7 @@
                 探索対象のベースURLを指定します。
               </div>
             </label>
-            <input type="text" id="gbTarget" value="http://192.168.1.1/" placeholder="例: http://example.com/" />
+            <input type="text" id="gbTarget" value="http://dummy-web/" placeholder="例: http://dummy-web/" />
           </div>
 
           <!-- 探索モード -->
@@ -429,7 +429,7 @@
                 リクエストを送信する対象のURLを指定します。
               </div>
             </label>
-            <input type="text" id="curlTarget" value="http://192.168.1.1/" placeholder="例: http://example.com/" />
+            <input type="text" id="curlTarget" value="http://dummy-web/" placeholder="例: http://dummy-web/" />
           </div>
 
           <!-- HTTPメソッド -->
@@ -608,7 +608,7 @@
             <label class="opt-label group relative flex items-center gap-1 w-max" for="msfRhosts">
               🎯 ターゲット (RHOSTS)
             </label>
-            <input type="text" id="msfRhosts" value="192.168.1.1" placeholder="例: 192.168.1.1" />
+            <input type="text" id="msfRhosts" value="dummy-web" placeholder="例: dummy-web" />
           </div>
           <div>
             <label class="opt-label group relative flex items-center gap-1 w-max" for="msfRport">
@@ -625,7 +625,7 @@
             <span class="cmd-name">nmap</span>
             <span class="cmd-flag"> -sV</span>
             <span class="cmd-flag"> -T3</span>
-            <span class="cmd-target"> 192.168.1.1</span>
+            <span class="cmd-target"> dummy-web</span>
           </div>
         </div>
 

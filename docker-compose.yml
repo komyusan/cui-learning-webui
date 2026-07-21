@@ -10,6 +10,20 @@ services:
       - ./frontend:/frontend   # main.py が ../frontend (=/frontend) を参照するためマウント
     environment:
       - PYTHONUNBUFFERED=1
+    # ▼▼▼【DNS・IPv6対策】▼▼▼
+    dns_opt:
+      # A/AAAA クエリを並行ではなく逐次実行させる（IPv6タイムアウト待ちを終わらせる）
+      - single-request-reopen
+    dns:
+      # Docker for Mac の内蔵 DNS をバイパスしてパブリック DNS を指定する
+      # Google DNS IPv4 のみを使用（IPv6 の 2001:4860:4860::8888 は指定しない）
+      - 8.8.8.8
+      - 8.8.4.4
+    sysctls:
+      # コンテナ OS レベルでの IPv6 無効化（永続的な効果はないが念のため維持）
+      - net.ipv6.conf.all.disable_ipv6=1
+      - net.ipv6.conf.default.disable_ipv6=1
+    # ▲▲▲ここまで▲▲▲
   iperf3-server:
     image: networkstatic/iperf3
     command: -s

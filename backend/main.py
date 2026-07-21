@@ -174,12 +174,15 @@ async def execute_command(req: ExecuteRequest):
         network_mode = compose_network
     elif req.tool == "hydra":
         opts = HydraOptions(**req.options)
-        command = build_hydra_command(opts)
+        # cui-learning-sandbox の ENTRYPOINT は /entrypoint.sh (exec "$@") なので
+        # ツール名を先頭に付けてフルコマンドとして渡す必要がある
+        command = ["hydra"] + build_hydra_command(opts)
         image = "cui-learning-sandbox:latest"
-        network_mode = compose_network # hydraもダミーサーバへ通信するかもしれないので許可
+        network_mode = compose_network # hydra は自身の SSH に接続するためネットワーク許可
     elif req.tool == "aircrack-ng":
         opts = AircrackOptions(**req.options)
-        command = build_aircrack_command(opts)
+        # 同様にツール名を先頭に付ける
+        command = ["aircrack-ng"] + build_aircrack_command(opts)
         image = "cui-learning-sandbox:latest"
     elif req.tool == "iperf3":
         opts = Iperf3Options(**req.options)
@@ -192,7 +195,12 @@ async def execute_command(req: ExecuteRequest):
         image = "metasploitframework/metasploit-framework:latest"
         network_mode = compose_network
 
-    command_str = f"{req.tool} " + " ".join(command)
+    # command リストにすでにツール名が含まれている場合（hydra, aircrack-ng）は
+    # そのまま join する。含まれていない場合（nmap 等）はツール名を先頭に付ける。
+    if command and command[0] == req.tool:
+        command_str = " ".join(command)
+    else:
+        command_str = f"{req.tool} " + " ".join(command)
     logger.info(f"Built command: {command_str}")
 
     # サンドボックスで実行

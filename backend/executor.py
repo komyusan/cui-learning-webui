@@ -62,7 +62,8 @@ def run_command_in_sandbox(command: list[str], image: str = SANDBOX_IMAGE, netwo
             mem_limit=mem_limit,
             cpu_period=RESOURCE_LIMITS["cpu_period"],
             cpu_quota=RESOURCE_LIMITS["cpu_quota"],
-            # volumes={WORDLISTS_DIR: {"bind": "/usr/share/wordlists", "mode": "ro"}},
+            # volumes は不要: ワードリストは cui-learning-sandbox イメージに焼き込み済み
+            # (Docker Desktop では /app/wordlists のようなコンテナ内パスをマウントできないため)
             network_mode=network_mode, # 引数で受け取ったネットワークモードを適用して外部通信を制御する
         )
 

@@ -8,10 +8,27 @@ RUN apt-get update && apt-get install -y \
     openssh-server \
     && rm -rf /var/lib/apt/lists/*
 
+# SSH デーモンの起動に必要なディレクトリを作成
 RUN mkdir -p /var/run/sshd
-RUN useradd -m admin && echo "admin:password123" | chpasswd
 
-COPY entrypoint.sh /entrypoint.sh
+# 演習用アカウント: admin / password123
+RUN useradd -m admin && echo "admin:password123" | chpasswd
+# root のパスワード設定（SSH でのパスワードログインを許可するため）
+RUN echo "root:toor" | chpasswd
+
+# SSH 設定: パスワード認証とrootログインを許可（演習サンドボックスのみ）
+RUN echo "PermitRootLogin yes" >> /etc/ssh/sshd_config \
+    && echo "PasswordAuthentication yes" >> /etc/ssh/sshd_config \
+    && echo "UsePAM yes" >> /etc/ssh/sshd_config \
+    && ssh-keygen -A
+
+# ワードリストをイメージに焼き込む
+# （executor.py がコンテナからボリュームマウントすると Docker Desktop の
+#   File Sharing 制限でエラーになるため、ビルド時に COPY する）
+COPY wordlists/ /usr/share/wordlists/
+
+# サンドボックス専用 entrypoint（バックエンドの uvicorn 用 entrypoint.sh とは別物）
+COPY entrypoint.sandbox.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 ENTRYPOINT ["/entrypoint.sh"]
