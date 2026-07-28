@@ -18,11 +18,16 @@ class GobusterOptions(BaseModel):
     extra_flags: Optional[str] = None
 
 class CurlOptions(BaseModel):
-    target: str
-    method: str = "GET"
-    header: Optional[str] = None
-    verbose: bool = False
-    extra_flags: Optional[str] = None
+    target: str                             # リクエスト先の URL
+    method: str = "GET"                     # HTTP メソッド（デフォルト: GET）
+    header: Optional[str] = None           # 追加する HTTP ヘッダー（例: "Content-Type: application/json"）
+    verbose: bool = False                  # -v フラグ: 詳細なHTTP通信ログを出力するか
+    # ▼▼▼変更箇所▼▼▼ -L (--location) オプションを追加
+    # curl はデフォルトでリダイレクト（301/302 等）を自動追跡しない。
+    # このフラグを True にすると -L オプションが付加され、リダイレクト先を自動的に追跡する。
+    # DVWA のようにルート(/)→ログインページへリダイレクトするサイトの HTML 取得に必要。
+    follow_location: bool = False          # -L フラグ: リダイレクトを自動追跡するか（デフォルト: False）
+    # ▲▲▲変更箇所ここまで▲▲▲
 
 class HydraOptions(BaseModel):
     target: str
@@ -53,6 +58,8 @@ class ExecuteRequest(BaseModel):
     tool: str
     current_step: str = "Step 1"
     options: dict
+    # ▼▼▼変更箇所▼▼▼ フロントエンドから既存セッションを引き継ぐための session_id（省略時は None → 新規セッションを自動生成）
+    session_id: Optional[str] = None
 
 class ExecuteResponse(BaseModel):
     command: str
@@ -60,3 +67,5 @@ class ExecuteResponse(BaseModel):
     stderr: str
     exit_code: int
     ai_explanation: Optional[str] = None
+    # ▼▼▼変更箇所▼▼▼ レスポンスに session_id を追加（フロントエンドが localStorage に保存して次回リクエストに使う）
+    session_id: Optional[str] = None    # 確定したセッション ID（新規生成 or 既存継続）

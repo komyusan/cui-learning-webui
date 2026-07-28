@@ -8,6 +8,8 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./frontend:/frontend   # main.py が ../frontend (=/frontend) を参照するためマウント
+      # ▼▼▼変更箇所▼▼▼ SQLite DB ファイルを名前付きボリュームに永続化（コンテナ再起動後もデータが消えない）
+      - db_data:/app/data
     environment:
       - PYTHONUNBUFFERED=1
     # ▼▼▼【DNS・IPv6対策】▼▼▼
@@ -24,6 +26,7 @@ services:
       - net.ipv6.conf.all.disable_ipv6=1
       - net.ipv6.conf.default.disable_ipv6=1
     # ▲▲▲ここまで▲▲▲
+
   iperf3-server:
     image: networkstatic/iperf3
     command: -s
@@ -37,6 +40,54 @@ services:
     ports:
       - "8080:80"
 
+  # ▼▼▼変更箇所▼▼▼ ── やられ環境コンテナ（学習用ターゲット群）─────────────────────────────
+
+  dvwa:
+    # DVWA (Damn Vulnerable Web Application)
+    # SQLインジェクション・XSS・CSRFなど多種のWebアプリ脆弱性を演習できるターゲット
+    image: vulnerables/web-dvwa             # Docker Hub 公式の DVWA イメージ
+    container_name: dvwa                    # バックエンドから "dvwa" というホスト名でアクセス可能にする
+    # ▼▼▼変更箇所▼▼▼ Apple Silicon (arm64) Mac では x86_64 専用イメージを Rosetta2 経由で実行するため指定
+    platform: linux/amd64                   # x86_64 イメージを ARM Mac 上でエミュレート実行
+    ports:
+      - "8081:80"                           # ホスト 8081 → コンテナ 80 (HTTP) にマッピング
+
+  metasploitable:
+    # Metasploitable2
+    # 古いサービス (FTP:21, Telnet:23, SSH:22, HTTP:80, MySQL:3306 等) を多数稼働させた
+    # 侵入テスト演習用の意図的に脆弱な Linux OS イメージ
+    image: tleemcjr/metasploitable2         # Metasploitable2 の非公式 Docker イメージ
+    container_name: metasploitable          # バックエンドから "metasploitable" で名前解決できる
+    # ▼▼▼変更箇所▼▼▼ Apple Silicon (arm64) Mac では x86_64 専用イメージを Rosetta2 経由で実行するため指定
+    platform: linux/amd64                   # x86_64 イメージを ARM Mac 上でエミュレート実行
+    ports:
+      - "2222:22"                           # SSH  : ホスト 2222 → コンテナ 22
+      - "2121:21"                           # FTP  : ホスト 2121 → コンテナ 21
+      - "8082:80"                           # HTTP : ホスト 8082 → コンテナ 80
+    tty: true                               # 一部のサービス起動に擬似 TTY が必要なため有効化
+
+  mysql:
+    # MySQL 5.7（意図的に脆弱なパスワード設定）
+    # hydra や nmap でのサービス検出・パスワードクラック演習に使用する
+    image: mysql:5.7                        # MySQL バージョン 5.7 の公式イメージ
+    container_name: mysql                   # バックエンドから "mysql" で名前解決できる
+    # ▼▼▼変更箇所▼▼▼ Apple Silicon (arm64) Mac では x86_64 専用イメージを Rosetta2 経由で実行するため指定
+    platform: linux/amd64                   # x86_64 イメージを ARM Mac 上でエミュレート実行
+    ports:
+      - "3306:3306"                         # MySQL : ホスト 3306 → コンテナ 3306
+    environment:
+      MYSQL_ROOT_PASSWORD: password         # root ユーザーのパスワード（推測しやすい値で演習用）
+      MYSQL_DATABASE: dvwa                  # 起動時に "dvwa" データベースを自動作成
+      MYSQL_USER: dvwa                      # 追加ユーザー名（DVWA と同じ認証情報で演習可能）
+      MYSQL_PASSWORD: p@ssw0rd             # 追加ユーザーのパスワード（辞書攻撃の練習用）
+
+  # ▲▲▲変更箇所ここまで▲▲▲
+
 networks:
   default:
     name: cui-learning-network
+
+# ▼▼▼変更箇所▼▼▼ 名前付きボリューム定義（SQLite DB ファイルの永続化用）
+volumes:
+  db_data:
+

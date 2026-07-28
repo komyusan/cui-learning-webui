@@ -2,6 +2,8 @@ FROM python:3.11-slim
 WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
+# ▼▼▼変更箇所▼▼▼ SQLite DB ファイルの永続化用ディレクトリを作成（ボリュームマウント先）
+RUN mkdir -p /app/data
 COPY . .
 
 # entrypoint.sh を実行権限付きでコピー

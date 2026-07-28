@@ -3,3 +3,5 @@ uvicorn[standard]==0.34.2
 docker==7.1.0
 python-multipart==0.0.20
 openai>=1.0.0
+# ▼▼▼変更箇所▼▼▼ SQLite/DB連携用ライブラリ追加
+sqlalchemy>=2.0.0

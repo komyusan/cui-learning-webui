@@ -10,10 +10,15 @@ CUI Learning WebUI — FastAPI バックエンド
 import logging
 import ipaddress
 import re
+import uuid                                         # ▼▼▼変更箇所▼▼▼ UUID生成用（session_id の自動発行に使用）
+import time                                         # ▼▼▼変更箇所▼▼▼ コマンド実行時間計測用
+from contextlib import asynccontextmanager          # ▼▼▼変更箇所▼▼▼ lifespan イベント定義用
+from datetime import datetime, timezone             # ▼▼▼変更箇所▼▼▼ DB の created_at 算出用
 from urllib.parse import urlparse
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends # ▼▼▼変更箇所▼▼▼ Depends を追加（依存注入でDBセッションを受け取る）
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy.orm import Session                  # ▼▼▼変更箇所▼▼▼ DB セッションの型ヒント用
 import os
 
 from executor import run_command_in_sandbox
@@ -28,6 +33,8 @@ from commands import (
     build_iperf_command, build_metasploit_command
 )
 from ai_service import build_llm_context, generate_ai_response
+from database import get_db, init_db               # ▼▼▼変更箇所▼▼▼ DB初期化関数と依存注入関数をインポート
+from db_models import Session as DBSession, CommandLog  # ▼▼▼変更箇所▼▼▼ ORM モデルをインポート（Session は名前衝突を避けるため DBSession と alias）
 
 # ──────────────────────────────────────────────
 # ロギング設定
@@ -39,12 +46,31 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # ──────────────────────────────────────────────
+# ▼▼▼変更箇所▼▼▼ lifespan イベント（アプリ起動時にDBテーブルを自動作成）
+# ──────────────────────────────────────────────
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    FastAPI の lifespan イベントハンドラ。
+    アプリ起動時（yield 前）に init_db() を呼び、
+    sessions / command_logs テーブルが存在しない場合は自動作成する。
+    """
+    # ── 起動処理 ──
+    logger.info("[lifespan] アプリケーション起動: DB テーブルを初期化します")
+    init_db()                           # sessions / command_logs テーブルを CREATE TABLE IF NOT EXISTS で作成
+    logger.info("[lifespan] DB テーブルの初期化が完了しました")
+    yield                               # アプリの実行中はここで待機
+    # ── 終了処理（必要であればここに書く）──
+    logger.info("[lifespan] アプリケーションを終了します")
+
+# ──────────────────────────────────────────────
 # FastAPI アプリ初期化
 # ──────────────────────────────────────────────
 app = FastAPI(
     title="CUI Learning WebUI API",
     description="セキュリティツール演習のためのCUI学習支援システム",
     version="0.1.0",
+    lifespan=lifespan,                  # ▼▼▼変更箇所▼▼▼ lifespan を登録（起動時の DB 初期化に必要）
 )
 
 # CORS設定（開発時はすべてのオリジンを許可）
@@ -79,7 +105,12 @@ def is_safe_target(target_input: str) -> bool:
         "iperf3-server",
         "target-web",
         "example.com",
-        "dummy-web"  # 学習用ダミーサーバを追加
+        "dummy-web",    # 学習用ダミーサーバ（nginx）
+        # ▼▼▼変更箇所▼▼▼ やられ環境コンテナを攻撃ターゲットとして許可
+        "dvwa",         # Damn Vulnerable Web Application（Webアプリ脆弱性演習用）
+        "metasploitable",  # Metasploitable2（旧式サービス群が稼働する侵入テスト演習OS）
+        "mysql",        # MySQL 5.7（脆弱なパスワード設定のDBサーバ、パスワードクラック演習用）
+        # ▲▲▲変更箇所ここまで▲▲▲
     }
 
     for target in targets:
@@ -117,6 +148,113 @@ def is_safe_target(target_input: str) -> bool:
 
     return True
 
+
+# ──────────────────────────────────────────────
+# ▼▼▼変更箇所▼▼▼ ヘルプリクエスト判定ヘルパー関数
+# ──────────────────────────────────────────────
+def _is_help_request(command_list: list[str]) -> bool:
+    """
+    コマンドリストに --help / -h / man 等のヘルプ系フラグが含まれているか判定する。
+
+    Parameters
+    ----------
+    command_list : 実行するコマンドのトークンリスト（例: ["nmap", "-sV", "--help"]）
+
+    Returns
+    -------
+    True  : ヘルプ系フラグを含む
+    False : 含まない
+    """
+    HELP_FLAGS = {"--help", "-h", "man", "--version", "-v"}     # ヘルプ系とみなすフラグの集合
+    return any(token in HELP_FLAGS for token in command_list)   # いずれかのフラグが存在すれば True
+
+
+# ──────────────────────────────────────────────
+# ▼▼▼変更箇所▼▼▼ セッション取得または新規作成ヘルパー関数
+# ──────────────────────────────────────────────
+def _get_or_create_session(
+    db: Session,
+    session_id: str | None,
+    current_step: str,
+) -> DBSession:
+    """
+    session_id が指定されていれば既存セッションを取得し、current_step を更新する。
+    session_id が None または存在しない場合は新しいセッションを作成する。
+
+    Parameters
+    ----------
+    db           : SQLAlchemy DB セッション（FastAPI Depends から注入）
+    session_id   : フロントエンドから受け取った session_id（なければ None）
+    current_step : 現在の PTES 学習フェーズ名
+
+    Returns
+    -------
+    DBSession : 既存または新規の Session ORM オブジェクト
+    """
+    db_session = None                                   # 取得/作成したセッションを格納する変数
+
+    if session_id:                                      # session_id が指定されている場合
+        db_session = (
+            db.query(DBSession)                         # sessions テーブルを検索
+            .filter(DBSession.session_id == session_id) # 一致する session_id を絞り込む
+            .first()                                    # 最初の1件を取得（存在しなければ None）
+        )
+
+    if db_session is None:                              # DB にセッションが存在しない場合（初回 or session_id 未指定）
+        new_id = session_id or str(uuid.uuid4())        # 指定された ID か新規 UUID を使う
+        db_session = DBSession(                         # 新しい Session オRM オブジェクトを生成
+            session_id=new_id,                          # セッション ID を設定
+            current_step=current_step,                  # 現在の学習フェーズを設定
+            created_at=datetime.now(timezone.utc),      # 作成日時（UTC）を設定
+            updated_at=datetime.now(timezone.utc),      # 更新日時（UTC）を設定
+        )
+        db.add(db_session)                              # DB セッションに追加（まだ INSERT はされない）
+        db.flush()                                      # session_id を確定させる（commit 前に ID を使えるよう）
+        logger.info("[session] 新規セッション作成: %s", db_session.session_id)
+    else:                                               # 既存セッションが見つかった場合
+        db_session.current_step = current_step          # 現在の学習フェーズを最新に更新
+        db_session.updated_at = datetime.now(timezone.utc)  # 更新日時を現在時刻に更新
+        logger.info("[session] 既存セッション取得: %s", db_session.session_id)
+
+    return db_session                                   # Session ORM オブジェクトを返す
+
+
+# ──────────────────────────────────────────────
+# ▼▼▼変更箇所▼▼▼ 前回コマンドからの経過時間を算出するヘルパー関数
+# ──────────────────────────────────────────────
+def _calc_time_since_last_cmd(db: Session, session_id: str) -> float:
+    """
+    同一セッションの直近の command_log レコードの created_at と
+    現在時刻の差分（秒）を算出する。
+
+    Parameters
+    ----------
+    db         : SQLAlchemy DB セッション
+    session_id : 対象のセッション ID
+
+    Returns
+    -------
+    float : 前回コマンドからの経過秒数。初回（ログなし）は 0.0 を返す。
+    """
+    last_log = (
+        db.query(CommandLog)                            # command_logs テーブルを検索
+        .filter(CommandLog.session_id == session_id)   # 同じセッションのログのみ
+        .order_by(CommandLog.created_at.desc())        # created_at の降順（最新が先頭）
+        .first()                                        # 最新の1件を取得
+    )
+
+    if last_log is None:                                # 同一セッションに過去のログがない（初回）
+        return 0.0                                      # 初回は経過時間 0.0 を返す
+
+    # 前回ログの created_at は UTC naive datetime として保存されているため
+    # 現在の UTC 時刻も naive datetime で計算する
+    now_utc = datetime.now(timezone.utc).replace(tzinfo=None)   # タイムゾーン情報を除去して比較
+    last_time = last_log.created_at                              # 直近ログの作成日時
+
+    elapsed = (now_utc - last_time).total_seconds()    # 経過秒数を計算（timedelta → float）
+    return max(0.0, elapsed)                            # 負の値にならないよう 0.0 以上を保証
+
+
 # ──────────────────────────────────────────────
 # エンドポイント
 # ──────────────────────────────────────────────
@@ -126,7 +264,10 @@ async def health_check():
 
 
 @app.post("/api/execute", response_model=ExecuteResponse)
-async def execute_command(req: ExecuteRequest):
+async def execute_command(
+    req: ExecuteRequest,
+    db: Session = Depends(get_db),      # ▼▼▼変更箇所▼▼▼ FastAPI の依存注入で DB セッションを受け取る
+):
     """
     フロントエンドからオプションを受け取り、
     コマンドを生成してDockerサンドボックスで実行する。
@@ -203,8 +344,32 @@ async def execute_command(req: ExecuteRequest):
         command_str = f"{req.tool} " + " ".join(command)
     logger.info(f"Built command: {command_str}")
 
+    # ▼▼▼変更箇所▼▼▼ ── セッション管理 ──────────────────────────────────────
+    # リクエストから session_id を取得（なければ None → 新規セッションを自動生成）
+    session_id_from_req = req.session_id                       # Pydantic モデルから直接取得
+
+    # DB からセッションを取得または新規作成
+    db_session = _get_or_create_session(
+        db=db,
+        session_id=session_id_from_req,     # フロントエンドから受け取った session_id（なければ None）
+        current_step=req.current_step,      # 現在の PTES 学習フェーズ
+    )
+    active_session_id = db_session.session_id   # 確定した session_id（新規 or 既存）
+
+    # ▼▼▼変更箇所▼▼▼ ── 前回コマンドからの経過時間を計算 ──────────────────────
+    time_since_last = _calc_time_since_last_cmd(db, active_session_id)  # 前回コマンドからの経過秒数
+    # ▼▼▼変更箇所▼▼▼ ── ヘルプフラグ判定 ──────────────────────────────────────
+    is_help = _is_help_request(command)         # --help / -h 等のフラグが含まれるか判定
+
+    # ▼▼▼変更箇所▼▼▼ ── コマンド実行時間の計測開始 ────────────────────────────
+    exec_start = time.monotonic()               # 計測開始時刻（time.monotonic は sleep や NTP の影響を受けない）
+
     # サンドボックスで実行
     result = run_command_in_sandbox(command, image=image, network_mode=network_mode)
+
+    # ▼▼▼変更箇所▼▼▼ ── コマンド実行時間の計測終了 ────────────────────────────
+    execution_duration = time.monotonic() - exec_start  # コマンド実行にかかった秒数（float）
+
     exit_code = result["exit_code"]
 
     # AIコンテキスト生成とAI解説の取得
@@ -212,12 +377,40 @@ async def execute_command(req: ExecuteRequest):
     logger.info(f"LLM Context: {llm_context_json}")
     ai_explanation = generate_ai_response(llm_context_json, req.tool)
 
+    # ▼▼▼変更箇所▼▼▼ ── コマンドログを DB に保存 ──────────────────────────────
+    # コマンドオプション部分のみを文字列として保存（ツール名除く）
+    options_str = " ".join(opt for opt in command if opt != req.tool)   # ツール名を除いたオプション部分
+
+    log_entry = CommandLog(                                     # CommandLog ORM オブジェクトを生成
+        session_id=active_session_id,                           # 紐づくセッション ID
+        tool_name=req.tool,                                     # 使用したツール名
+        command_options=options_str if options_str else None,   # 実行オプション文字列（空なら None）
+        exit_code=exit_code,                                    # コマンドの終了コード
+        ai_response=ai_explanation,                             # AI チューターの解説テキスト
+        execution_duration=execution_duration,                  # コマンド実行にかかった秒数
+        time_since_last_cmd=time_since_last,                    # 前回コマンドからの経過秒数
+        is_help_request=is_help,                                # ヘルプフラグの有無
+        created_at=datetime.now(timezone.utc).replace(tzinfo=None),  # 記録日時（UTC naive）
+    )
+    db.add(log_entry)       # DB セッションにログを追加（まだ INSERT はされない）
+    db.commit()             # ここで session の UPDATE と log の INSERT を一括コミット
+    db.refresh(log_entry)   # commit 後に DB から最新の状態（log_id 等）を取得
+
+    logger.info(
+        "[db] CommandLog 保存完了: log_id=%d, session=%s, tool=%s, exit=%d, duration=%.3fs",
+        log_entry.log_id, active_session_id, req.tool, exit_code, execution_duration,
+    )
+    # ▲▲▲変更箇所ここまで▲▲▲
+
     return ExecuteResponse(
         command=command_str,
         stdout=result["stdout"],
         stderr=result["stderr"],
         exit_code=exit_code,
-        ai_explanation=ai_explanation
+        ai_explanation=ai_explanation,
+        # ▼▼▼変更箇所▼▼▼ DB コミット後に確定した session_id をレスポンスに含める
+        # フロントエンドはこの値を localStorage に保存し、次回リクエストに session_id フィールドとして送る
+        session_id=active_session_id,       # 新規生成 or 既存継続のどちらでも確定済み ID
     )
 
 # ──────────────────────────────────────────────

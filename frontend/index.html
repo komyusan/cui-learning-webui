@@ -478,6 +478,17 @@
                 <span>-v</span>
                 <span class="badge">Verbose</span>
               </label>
+              <!-- ▼▼▼変更箇所▼▼▼ -L (リダイレクト追従) チェックボックスを追加 -->
+              <!-- curl はデフォルトでリダイレクト (301/302 等) を追跡しない。             -->
+              <!-- このチェックを入れると -L フラグが付加され、リダイレクト先の HTML も取得できる。 -->
+              <label class="checkbox-item group relative w-max">
+                <input type="checkbox" id="curlFollowLocation" />
+                <!-- チェックボックスのラベル: オプション名 -->
+                <span>-L</span>
+                <!-- バッジ: オプションの概要を短く表示 -->
+                <span class="badge">リダイレクト追従</span>
+              </label>
+              <!-- ▲▲▲変更箇所ここまで▲▲▲ -->
             </div>
           </div>
         </div>
@@ -678,7 +689,9 @@
     // ─── コマンドプレビューのリアルタイム更新 ───
     const nmapFields = ["target", "scanType", "timing", "portRange", "osDetect", "verbose"];
     const gobusterFields = ["gbTarget", "gbMode", "gbWordlist", "gbQuiet"];
-    const curlFields = ["curlTarget", "curlMethod", "curlHeader", "curlVerbose"];
+    // ▼▼▼変更箇所▼▼▼ curlFollowLocation を無効化対象フィールドリストに追加（実行中はフォームをロック）
+    const curlFields = ["curlTarget", "curlMethod", "curlHeader", "curlVerbose", "curlFollowLocation"];
+    // ▲▲▲変更箇所ここまで▲▲▲
     const hydraFields = ["hydraTarget", "hydraService", "hydraUser", "hydraWordlist", "hydraUserList"];
     const aircrackFields = ["aircrackTarget", "aircrackWordlist", "aircrackBssid"];
     const iperf3Fields = ["iperf3Target", "iperf3Protocol", "iperf3Time", "iperf3Bandwidth"];
@@ -782,16 +795,22 @@
           if (quiet) flags.push("-q");
           return { tool, target, flags };
       } else if (tool === "curl") {
-          const target = document.getElementById("curlTarget").value.trim() || "URL";
-          const method = document.getElementById("curlMethod").value;
-          const header = document.getElementById("curlHeader").value.trim();
-          const verbose = document.getElementById("curlVerbose").checked;
-          
-          const flags = [];
-          if (method !== "GET") flags.push("-X", method);
-          if (header) flags.push("-H", `"${header}"`);
-          if (verbose) flags.push("-v");
-          
+          const target = document.getElementById("curlTarget").value.trim() || "URL";  // ターゲット URL を取得
+          const method = document.getElementById("curlMethod").value;                  // HTTP メソッドを取得
+          const header = document.getElementById("curlHeader").value.trim();           // 追加ヘッダーを取得
+          const verbose = document.getElementById("curlVerbose").checked;              // -v チェック状態を取得
+          // ▼▼▼変更箇所▼▼▼ -L チェックボックスの状態を取得してプレビューに反映
+          const followLocation = document.getElementById("curlFollowLocation").checked; // -L チェック状態を取得
+          // ▲▲▲変更箇所ここまで▲▲▲
+
+          const flags = [];                                                             // コマンドフラグのリスト
+          if (method !== "GET") flags.push("-X", method);                             // GET 以外なら -X を追加
+          if (header) flags.push("-H", `"${header}"`);                               // ヘッダーがあれば -H を追加
+          if (verbose) flags.push("-v");                                              // verbose が有効なら -v を追加
+          // ▼▼▼変更箇所▼▼▼ -L フラグをプレビューのフラグ配列に追加
+          if (followLocation) flags.push("-L");                                       // リダイレクト追従が有効なら -L を追加
+          // ▲▲▲変更箇所ここまで▲▲▲
+
           return { tool, target, flags };
       } else if (tool === "hydra") {
           const target = document.getElementById("hydraTarget").value.trim() || "127.0.0.1";
@@ -1016,10 +1035,15 @@
             payload = {
               tool: "curl",
               options: {
-                target,
-                method: document.getElementById("curlMethod").value,
-                header: document.getElementById("curlHeader").value.trim() || null,
-                verbose: document.getElementById("curlVerbose").checked,
+                target,                                                                 // ターゲット URL
+                method: document.getElementById("curlMethod").value,                  // HTTP メソッド
+                header: document.getElementById("curlHeader").value.trim() || null,   // 追加ヘッダー（未入力は null）
+                verbose: document.getElementById("curlVerbose").checked,              // -v フラグの有無
+                // ▼▼▼変更箇所▼▼▼ -L フラグの状態を API ペイロードに含める
+                // バックエンドの CurlOptions.follow_location フィールドに対応する。
+                // True のとき build_curl_command() が "-L" をコマンドリストに追加する。
+                follow_location: document.getElementById("curlFollowLocation").checked, // -L フラグの有無
+                // ▲▲▲変更箇所ここまで▲▲▲
               }
             };
         } else if (tool === "hydra") {
@@ -1065,10 +1089,17 @@
 
         payload.current_step = document.getElementById("currentStep").value;
 
+        // ▼▼▼変更箇所▼▼▼ ── セッション ID の引き継ぎ ──────────────────────────────
+        // localStorage から保存済みの session_id を取得し、payload にセットする。
+        // localStorage.getItem() は値がなければ null を返すため、
+        // 初回リクエスト時は null → バックエンドが新規 UUID を自動生成する。
+        payload.session_id = localStorage.getItem("cui_session_id"); // 保存済みIDを取得（なければ null）
+        // ▲▲▲変更箇所ここまで▲▲▲
+
         const res = await fetch(`${API_BASE}/api/execute`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
+          body: JSON.stringify(payload),    // session_id を含む payload を送信
           signal: AbortSignal.timeout(120000),
         });
 
@@ -1079,6 +1110,17 @@
           appendTerminal(`<div class="term-error">エラー: ${err.detail || res.statusText}</div>`);
         } else {
           const data = await res.json();
+
+          // ▼▼▼変更箇所▼▼▼ ── session_id の保存 ──────────────────────────────────
+          // レスポンスに含まれる session_id を localStorage に保存する。
+          // 次回のリクエスト時に payload.session_id として送ることで、
+          // バックエンドが同じセッションのログとして記録できる。
+          if (data.session_id) {                                           // session_id がレスポンスに含まれていれば
+            localStorage.setItem("cui_session_id", data.session_id);      // localStorage に保存（上書き可）
+            console.log("[session] localStorage に session_id を保存:", data.session_id); // デバッグ用ログ
+          }
+          // ▲▲▲変更箇所ここまで▲▲▲
+
           if (data.stdout) appendTerminal(`<div class="term-output">${escapeHtml(data.stdout)}</div>`);
           if (data.stderr) appendTerminal(`<div class="term-error">${escapeHtml(data.stderr)}</div>`);
           if (data.exit_code === 0) {
