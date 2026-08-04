@@ -289,7 +289,10 @@ async def execute_command(
         if not isinstance(target_str, str) or not is_safe_target(target_str):
             raise HTTPException(
                 status_code=400,
-                detail="安全上の理由から、指定されたターゲットへの実行は制限されています。ローカル環境または dummy-web, example.com のみ指定可能です。"
+                # ▼▼▼変更箇所▼▼▼ エラーメッセージを現在のホワイトリストに合わせて更新
+                detail="安全上の理由から、指定されたターゲットへの実行は制限されています。"
+                        "指定可能なターゲット: localhost, 127.0.0.1, dummy-web, example.com, "
+                        "dvwa, metasploitable, mysql, iperf3-server、またはプライベートIPアドレス（192.168.x.x 等）"
             )
 
     # コマンドの構築
@@ -370,12 +373,36 @@ async def execute_command(
     # ▼▼▼変更箇所▼▼▼ ── コマンド実行時間の計測終了 ────────────────────────────
     execution_duration = time.monotonic() - exec_start  # コマンド実行にかかった秒数（float）
 
-    exit_code = result["exit_code"]
+    exit_code = result["exit_code"]                 # コマンドの終了コードを取得
+    # ▼▼▼変更箇所▼▼▼ stdout / stderr を result から取り出して変数に格納する
+    cmd_stdout = result.get("stdout", "")           # 標準出力テキストを取得（キーが存在しない場合は空文字）
+    cmd_stderr = result.get("stderr", "")           # 標準エラー出力テキストを取得（キーが存在しない場合は空文字）
+    # ▲▲▲変更箇所ここまで▲▲▲
 
     # AIコンテキスト生成とAI解説の取得
-    llm_context_json = build_llm_context(req, command, exit_code)
+    # ▼▼▼変更箇所▼▼▼ build_llm_context に stdout/stderr と Stuck State 情報を渡す
+    llm_context_json = build_llm_context(
+        req,            # フロントエンドからのリクエストオブジェクト
+        command,        # 実行したコマンドのトークンリスト
+        exit_code,      # コマンドの終了コード
+        stdout=cmd_stdout,                  # 標準出力テキスト
+        stderr=cmd_stderr,                  # 標準エラー出力テキスト
+        time_since_last_cmd=time_since_last, # ▼▼▼変更箇所▼▼▼ 前回コマンドからの経過秒数を追加
+        is_help_request=is_help,             # ▼▼▼変更箇所▼▼▼ ヘルプフラグ判定結果を追加
+    )
+    # ▲▲▲変更箇所ここまで▲▲▲
     logger.info(f"LLM Context: {llm_context_json}")
-    ai_explanation = generate_ai_response(llm_context_json, req.tool)
+    
+    # ▼▼▼変更箇所▼▼▼ generate_ai_response に Stuck State情報を渡し、戻り値(dict)を受け取る
+    ai_result = generate_ai_response(
+        llm_context_json=llm_context_json, 
+        tool=req.tool,
+        time_since_last_cmd=time_since_last, # ▼▼▼変更箇所▼▼▼ 経過時間を追加
+        is_help_request=is_help              # ▼▼▼変更箇所▼▼▼ ヘルプフラグを追加
+    )
+    ai_explanation = ai_result.get("message", "")      # AI フィードバックテキストを取り出す
+    ai_highlights  = ai_result.get("highlights", [])   # ハイライト用キーワードリストを取り出す（なければ空リスト）
+    # ▲▲▲変更箇所ここまで▲▲▲
 
     # ▼▼▼変更箇所▼▼▼ ── コマンドログを DB に保存 ──────────────────────────────
     # コマンドオプション部分のみを文字列として保存（ツール名除く）
@@ -403,14 +430,17 @@ async def execute_command(
     # ▲▲▲変更箇所ここまで▲▲▲
 
     return ExecuteResponse(
-        command=command_str,
-        stdout=result["stdout"],
-        stderr=result["stderr"],
-        exit_code=exit_code,
-        ai_explanation=ai_explanation,
+        command=command_str,                # 実行されたコマンド文字列
+        stdout=result["stdout"],            # コマンドの標準出力
+        stderr=result["stderr"],            # コマンドの標準エラー出力
+        exit_code=exit_code,               # 終了コード
+        ai_explanation=ai_explanation,      # AI チューターの解説テキスト（message フィールドから取得）
         # ▼▼▼変更箇所▼▼▼ DB コミット後に確定した session_id をレスポンスに含める
         # フロントエンドはこの値を localStorage に保存し、次回リクエストに session_id フィールドとして送る
         session_id=active_session_id,       # 新規生成 or 既存継続のどちらでも確定済み ID
+        # ▼▼▼変更箇所▼▼▼ AI がフォーカスしたキーワードリストをレスポンスに含める
+        # フロントエンドはこのリストを使い、ターミナル出力内の該当テキストを <span> でハイライトする
+        ai_highlights=ai_highlights,        # ハイライト用キーワードリスト（空リストの場合はハイライトなし）
     )
 
 # ──────────────────────────────────────────────

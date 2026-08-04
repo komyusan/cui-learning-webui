@@ -218,6 +218,22 @@
       color: var(--terminal-cyan);
     }
     .ai-placeholder { color: var(--muted); font-style: italic; font-size: 0.8rem; }
+    /* ▼▼▼変更箇所▼▼▼ ターミナルハイライト用 CSS クラス */
+    /* AI が指定したキーワードをターミナル出力中で皜色等で強調表示するためのクラス。   */
+    /* 分割注意効果を防ぎ、学生の視線をAIの解説とターミナルの間で分散させない効果。 */
+    .terminal-highlight {
+      background-color: rgba(255, 235, 59, 0.25); /* 背景色: 半透明の黄色 */
+      color: #ffeb3b;                             /* 文字色: 黄色系 */
+      font-weight: bold;                          /* 太字 */
+      padding: 0 3px;                             /* 左右に少しパディング */
+      border-radius: 3px;                         /* 圆角 */
+      border-bottom: 1px solid rgba(255, 235, 59, 0.6); /* 下線で更に目立たせる */
+      transition: background-color 0.3s;          /* ホバー時のアニメーション */
+    }
+    .terminal-highlight:hover {
+      background-color: rgba(255, 235, 59, 0.45); /* ホバー時に少し濃く */
+    }
+    /* ▲▲▲変更箇所ここまで▲▲▲ */
   </style>
 </head>
 <body>
@@ -1121,8 +1137,15 @@
           }
           // ▲▲▲変更箇所ここまで▲▲▲
 
-          if (data.stdout) appendTerminal(`<div class="term-output">${escapeHtml(data.stdout)}</div>`);
-          if (data.stderr) appendTerminal(`<div class="term-error">${escapeHtml(data.stderr)}</div>`);
+          // ▼▼▼変更箇所▼▼▼ ターミナル出力にハイライトを適用する
+          // バックエンドから ai_highlights (文字列の配列) が返ってきた場合、
+          // stdout / stderr 中の該当キーワードを <span> で囲んで HTML として描画する。
+          const highlights = data.ai_highlights || [];  // ハイライトリスト（無ければ空配列）
+          // stdout: applyHighlights でサニタイズ + ハイライトを適用して描画
+          if (data.stdout) appendTerminal(`<div class="term-output">${applyHighlights(data.stdout, highlights)}</div>`);
+          // stderr: 同様にハイライトを適用
+          if (data.stderr) appendTerminal(`<div class="term-error">${applyHighlights(data.stderr, highlights)}</div>`);
+          // ▲▲▲変更箇所ここまで▲▲▲
           if (data.exit_code === 0) {
             appendTerminal(`<div class="term-success">✓ 終了コード: 0 (成功)</div>`);
           } else {
@@ -1143,8 +1166,50 @@
     }
 
     function escapeHtml(s) {
+      // 任意の文字列を HTML 安全な形式にエスケープする
       return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
     }
+
+    // ▼▼▼変更箇所▼▼▼ ターミナル出力にハイライトを適用するヘルパー関数
+    /**
+     * テキストをサニタイズした後、キーワードを <span class="terminal-highlight"> で囲む。
+     *
+     * 注意: 必ず escapeHtml でサニタイズした後にキーワードを置換することで、
+     * HTML インジェクションを防ぐ。
+     * キーワード中に <, >, & が含まれる場合にもエスケープ後の形式でマッチする。
+     *
+     * @param {string}   text       - ターミナルに表示するテキスト（サニタイズ前）
+     * @param {string[]} highlights - ハイライトするキーワードの配列
+     * @returns {string} サニタイズ済みかつハイライト適用済みの HTML 文字列
+     */
+    function applyHighlights(text, highlights) {
+      // STEP1: まずテキスト全体をサニタイズする（XSS対策の基本）
+      let escaped = escapeHtml(text);        // <, >, & をエンティティ化
+
+      // STEP2: highlights リストが空、または配列でなければハイライト無しで返す
+      if (!Array.isArray(highlights) || highlights.length === 0) {
+        return escaped;                      // ハイライトなしの場合はサニタイズ済みテキストをそのまま返す
+      }
+
+      // STEP3: 各キーワードを順に置換してハイライトする
+      highlights.forEach(keyword => {
+        if (!keyword || typeof keyword !== "string") return; // 空文字や非文字列はスキップ
+
+        // キーワード中の正規表現特殊文字をエスケープする（シリアル化対策）
+        // 例: "2.3.4" の "." が正規表現ワイルドカードにならないようにエスケープする
+        const escapedKeyword = escapeHtml(keyword).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+        // エスケープ済みテキスト中のキーワードを <span> で囲む（大文字・小文字を区別しない）
+        const regex = new RegExp(escapedKeyword, "gi"); // gi: 大文字小文字無視＋全構マッチ
+        escaped = escaped.replace(
+          regex,
+          match => `<span class="terminal-highlight">${match}</span>` // マッチした文字列をスパンで囲む
+        );
+      });
+
+      return escaped;  // ハイライト適用済みの HTML 文字列を返す
+    }
+    // ▲▲▲変更箇所ここまで▲▲▲
 
     // ─── AI解説（ダミー実装） ───
     function showAiExplanation(cmdStr, flags, tool="nmap") {

@@ -62,10 +62,15 @@ class ExecuteRequest(BaseModel):
     session_id: Optional[str] = None
 
 class ExecuteResponse(BaseModel):
-    command: str
-    stdout: str
-    stderr: str
-    exit_code: int
-    ai_explanation: Optional[str] = None
+    command: str        # 実行されたコマンド文字列
+    stdout: str         # コマンドの標準出力
+    stderr: str         # コマンドの標準エラー出力
+    exit_code: int      # コマンドの終了コード
+    ai_explanation: Optional[str] = None  # AI チューターの解説テキスト
     # ▼▼▼変更箇所▼▼▼ レスポンスに session_id を追加（フロントエンドが localStorage に保存して次回リクエストに使う）
     session_id: Optional[str] = None    # 確定したセッション ID（新規生成 or 既存継続）
+    # ▼▼▼変更箇所▼▼▼ ハイライト用キーワードリストを追加
+    # AI がターミナル出力の中で特に注目させたいキーワード（例: "vsftpd 2.3.4", "21/tcp"）を格納する。
+    # フロントエンドはこのリストを使い、ターミナル出力内の該当文字列を <span> でハイライトする。
+    # デフォルトは空リスト（ハイライトなし）。
+    ai_highlights: list[str] = []      # ターミナルハイライト用キーワードリスト

@@ -184,111 +184,282 @@ def _build_openai_client() -> OpenAI:
 # ──────────────────────────────────────────────
 # コンテキスト生成
 # ──────────────────────────────────────────────
-def build_llm_context(req: ExecuteRequest, command_list: list[str], exit_code: int) -> str:
+
+# ▼▼▼変更箇所▼▼▼ トークン超過防止用の最大文字数定数
+_MAX_OUTPUT_LENGTH = 1000  # stdout / stderr の最大保持文字数（これを超えた場合は末尾を切り詰める）
+
+def _truncate_output(text: str, max_length: int = _MAX_OUTPUT_LENGTH) -> str:
+    """
+    出力テキストを max_length 文字以内に切り詰める。
+
+    トークン数超過を防ぐため、1000文字を超える場合は末尾を切り捨て、
+    「...（以下省略）」という省略文言を付加する。
+
+    Parameters
+    ----------
+    text       : 切り詰め対象の文字列（stdout または stderr）
+    max_length : 最大文字数（デフォルト: 1000）
+
+    Returns
+    -------
+    切り詰め後の文字列。元の文字数が max_length 以下なら変更なし。
+    """
+    if len(text) <= max_length:          # 文字数が上限以下なら何もしない
+        return text
+    # 上限を超えている場合: 先頭 max_length 文字を残し、省略文言を付加する
+    return text[:max_length] + "\n...(出力が長いため以下省略)..."
+
+
+# ▼▼▼変更箇所▼▼▼ stdout / stderr 引数に加え、time_since_last_cmd / is_help_request を追加
+def build_llm_context(
+    req: ExecuteRequest,
+    command_list: list[str],
+    exit_code: int,
+    stdout: str = "",                   # コマンドの標準出力（省略可、デフォルトは空文字）
+    stderr: str = "",                   # コマンドの標準エラー出力（省略可、デフォルトは空文字）
+    time_since_last_cmd: float = 0.0,  # 前回コマンドからの経過秒数
+    is_help_request: bool = False,      # ヘルプフラグ包含判定結果
+) -> str:
     """
     実行結果から LLM へ渡すコンテキスト JSON を生成する。
 
     Parameters
     ----------
-    req          : フロントエンドからのリクエスト
-    command_list : 実行されたコマンドのリスト
-    exit_code    : コマンドの終了コード
+    req                 : フロントエンドからのリクエスト
+    command_list        : 実行されたコマンドのリスト
+    exit_code           : コマンドの終了コード
+    stdout              : コマンドの標準出力テキスト
+    stderr              : コマンドの標準エラー出力テキスト
+    time_since_last_cmd : 前回コマンドからの経過秒数
+    is_help_request     : ヘルプフラグ包含判定結果
 
     Returns
     -------
     JSON 文字列
     """
-    user_options = [opt for opt in command_list if opt.startswith("-")]
+    user_options = [opt for opt in command_list if opt.startswith("-")]  # "-" で始まるトークンをオプションとして抽出
+
     context = {
-        "current_step": req.current_step,
-        "user_selected_options": user_options,
-        "execution_result": "success" if exit_code == 0 else "failed"
+        "current_step": req.current_step,               # 現在の学習ステップ名
+        "user_selected_options": user_options,           # ユーザーが選択したオプション一覧
+        "execution_result": "success" if exit_code == 0 else "failed",  # 終了コードを success/failed に変換
+        "exit_code": exit_code,                          # 数値の終了コードも直接渡す
+        "stdout": _truncate_output(stdout),              # 標準出力（切り詰め済み）
+        "stderr": _truncate_output(stderr),              # 標準エラー出力（切り詰め済み）
+        "time_since_last_cmd": time_since_last_cmd,      # 前回コマンドからの経過秒数
+        "is_help_request": is_help_request,              # ヘルプフラグが含まれていたか
     }
-    return json.dumps(context, ensure_ascii=False)
+    return json.dumps(context, ensure_ascii=False)  # JSON文字列として返す（日本語をエスケープしない）
 
 
 # ──────────────────────────────────────────────
 # システムプロンプト生成
 # ──────────────────────────────────────────────
+
+# ▼▼▼変更箇所▼▼▼ 引数を追加し、認知的負荷理論に基づくルールとStuck Stateの対応を組み込む
 def build_system_prompt(
-    current_step: str,
-    user_selected_options: list[str],
-    execution_result: str,
-    extra_materials: str | None = None,
+    current_step: str,                  # 現在の学習ステップ名
+    user_selected_options: list[str],   # ユーザーが使用したオプション一覧
+    execution_result: str,              # 実行結果文字列 ("success" / "failed")
+    exit_code: int = 0,                 # 数値の終了コード（結果分析ルールに使用）
+    stdout: str = "",                   # 標準出力テキスト（情報絞り込みルールに使用）
+    stderr: str = "",                   # 標準エラー出力テキスト（エラー分析に使用）
+    time_since_last_cmd: float = 0.0,  # 前回コマンドからの経過秒数
+    is_help_request: bool = False,      # ヘルプフラグ包含判定結果
+    extra_materials: str | None = None, # 将来的な外部講義資料の動的挿入用（任意）
 ) -> str:
     """
     AI チューター用のシステムプロンプトを組み立てる。
+
+    認知的負荷理論（足場かけ: Scaffolding）に基づき、3つの教育ルールを
+    システムプロンプトに組み込む。さらにStuck Stateを検知してサポートを強化する。
 
     Parameters
     ----------
     current_step           : 現在の学習ステップ名
     user_selected_options  : ユーザーが選択したオプション一覧
     execution_result       : 実行結果 ("success" / "failed")
+    exit_code              : コマンドの終了コード
+    stdout                 : 標準出力テキスト
+    stderr                 : 標準エラー出力テキスト
+    time_since_last_cmd    : 前回コマンドからの経過秒数
+    is_help_request        : ヘルプフラグ包含判定結果
     extra_materials        : 将来的に挿入する外部講義資料テキスト（任意）
 
     Returns
     -------
     システムプロンプト文字列
     """
-    options_str = ", ".join(user_selected_options) if user_selected_options else "（なし）"
+    options_str = ", ".join(user_selected_options) if user_selected_options else "（なし）"  # オプション一覧を文字列化
 
-    base_prompt = f"""あなたは、セキュリティとそれに関するコマンドを教える「レッスン主導型」の優秀なAIチューターです。
+    # ▼▼▼変更箇所▼▼▼ Stuck State（詰まり状態）の判定
+    _STUCK_THRESHOLD_SEC = 60.0                          # Stuck 判定の閾値秒数
+    is_stuck = (                                          # いずれか一方が真なら Stuck
+        time_since_last_cmd >= _STUCK_THRESHOLD_SEC      # 60秒以上の間隔がある
+        or is_help_request                               # またはヘルプフラグが含まれている
+    )
+
+    # ▼▼▼変更箇所▼▼▼ Stuck State判定結果のロギング
+    logger.info(f"Stuck State: {is_stuck} (Time: {time_since_last_cmd}, Help: {is_help_request})")
+
+    # ▼▼▼変更箇所▼▼▼ Stuck State に応じて完全に別プロンプトを生成（混在を排除）
+    if is_stuck:
+        # ────────────────────────────────────────────────────────
+        # 🚨 緊急サポートモード用プロンプト
+        # 「正解を教えるな」という禁止命令を一切含まない別プロンプトを生成。
+        # 通常プロンプトの後に「解除」を追記する方式だと LLM が先の禁止命令を
+        # 優先してしまうため、この方式に変更した。
+        # ────────────────────────────────────────────────────────
+        stuck_reason = (                                            # 詰まり理由を文字列で表現
+            f"前回の操作から {time_since_last_cmd:.0f} 秒以上経過"
+            if time_since_last_cmd >= _STUCK_THRESHOLD_SEC
+            else "ヘルプコマンドを実行"
+        )
+
+        prompt = f"""あなたは、セキュリティとコマンドを教える AI チューターです。
+現在、学生は「{stuck_reason}」したため行き詰まっています。
+
+現在の学習ステップ: {current_step}
+ユーザーが選択したオプション: {options_str}
+実行結果: {execution_result}（終了コード: {exit_code}）
+
+--- 実行された標準出力（stdout）---
+{stdout if stdout else "（出力なし）"}
+
+--- 実行された標準エラー出力（stderr）---
+{stderr if stderr else "（エラーなし）"}
+
+【🚨 緊急サポートモード — 以下の指示のみに従ってください】
+
+学生は今、詰まっています。通常の「ヒントだけ出す」制約はありません。
+次のことを行ってください：
+
+1. stdout/stderr の内容から、今の状況（どのサービスが動いているか等）を1〜2文で簡単に説明する。
+2. 次に学生が実行すべき**完全なコマンドを1つ**、コードブロックなしで提示する。
+   例: `nmap -sV -p 3306 metasploitable` のように具体的に書く。
+3. そのコマンドが「なぜ必要か」を1文で添える。
+4. 励ますひと言と絵文字で締める。
+
+回答は4行以内に収めること。"""
+
+    else:
+        # ────────────────────────────────────────────────────────
+        # 通常モード用プロンプト（足場かけ: 正解を教えない）
+        # ────────────────────────────────────────────────────────
+        prompt = f"""あなたは、セキュリティとそれに関するコマンドを教える「レッスン主導型」の優秀なAIチューターです。
 学生の自由な質問に直接答えるのではなく、あらかじめ定められたレッスンプラン（PTES）に従って、セキュリティ初学者を順序よく導いてください。
 
 現在の学習ステップ: {current_step}
 ユーザーが選択したオプション: {options_str}
-実行結果: {execution_result}
+実行結果: {execution_result}（終了コード: {exit_code}）
 
-【教える際の振る舞いとルール】
-1. 情報を小出しにする: 一度にすべてのコマンドの意味や仕組みを長文で解説せず、今実行しようとしているオプションだけにフォーカスして簡潔に解説してください。
-2. 心地よいフラストレーションを与える: 学生が答えを求めても、すぐに完全なコマンドの正解を教えないでください。意図的にヒントを最小限に留め、WebUI上のオプションを自分で選んで試行錯誤するように促してください。
-3. エラー発生時の建設的なフィードバック: エラーログが返ってきた場合、単に「失敗しました」と返すのではなく、ログの内容から「なぜ失敗したのか」のヒントを与え、再試行を促すようにナビゲートしてください。現在のステップをクリアするまで次のステップの答えは教えないでください。
-4. 出力の冗長性を防ぐ工夫: 解説が長くなりすぎるのを防ぎ、親しみやすさを出すために、回答には必ず1〜2個の絵文字を使用してください（最大3行以内）。"""
+--- 実行された標準出力（stdout）---
+{stdout if stdout else "（出力なし）"}
 
-    # 将来的な拡張: 外部講義資料をプロンプトに動的挿入
-    if extra_materials:
-        base_prompt += f"\n\n【参考資料】\n{extra_materials}"
+--- 実行された標準エラー出力（stderr）---
+{stderr if stderr else "（エラーなし）"}
 
-    return base_prompt
+【認知的負荷を下げるための教育ルール（必ず厳守してください）】
+
+ルール1【情報の絞り込み】:
+  実行結果（stdoutまたはstderr）に複数のポート、バージョン、サービス情報が含まれている場合、
+  それらをすべて解説してはいけません。
+  最も重要または脆弱性が疑われる「1つの要素（特定のポート番号やバージョン番号など）」だけを
+  選び、そこにのみ言及してください。その他の情報には触れないでください。
+
+ルール2【足場かけ（Scaffolding）】:
+  次に打つべき具体的なコマンドや正解を直接教えてはいけません。
+  必ず「このバージョンについて調べてみませんか？」や
+  「このポートは何のサービスに使われているか知っていますか？」といった、
+  学生自身が考えるきっかけとなる問いかけやヒントでフィードバックを終えてください。
+
+ルール3【結果の分析】:
+  終了コードが0（成功）であっても、出力内容から有益な情報が得られなかったと判断できる場合
+  （例: スキャン対象のポートがすべて閉じている、応答がない等）は、
+  単に「うまくいきました」と褒めるのではなく、
+  ターゲットの変更やオプションの追加・変更を具体的に示唆してください。
+
+【その他のルール】
+4. 情報を小出しにする: 今実行したオプションだけにフォーカスして簡潔に解説してください。
+5. 出力の冗長性を防ぐ: 回答には必ず1〜2個の絵文字を使用し、最大4行以内に収めてください。"""
+
+    # 外部講義資料をプロンプトに動的挿入（任意）
+    if extra_materials:                                             # 外部資料が指定されている場合のみ追加
+        prompt += f"\n\n【参考資料】\n{extra_materials}"
+
+    # ▼▼▼変更箇所▼▼▼ JSON 出力フォーマット指示（通常・緊急 共通で末尾に追加）
+    prompt += """
+
+【出力フォーマット（厳守）】
+必ず以下の JSON 形式のみで応答してください。それ以外の形式は禁止です。
+JSON以外のテキスト（前置きや後書き）は一切含めないでください。
+
+{
+  "message": "学生へのフィードバックテキスト（絵文字を含む、最大4行）",
+  "highlights": ["ターミナル出力内でハイライトすべきキーワード1", "キーワード2"]
+}
+
+- "message": 上記の指示に従ったフィードバックを日本語で記述してください。
+- "highlights": 学生に最も注目させたい語句を、stdout または stderr からそのまま抜き出した文字列で1〜2個だけリストしてください。注目させる情報がない場合は空リスト [] にしてください。"""
+
+    return prompt
+
 
 
 # ──────────────────────────────────────────────
 # AI レスポンス生成（メインエントリ）
 # ──────────────────────────────────────────────
+
+# ▼▼▼変更箇所▼▼▼ 戻り値の型を dict に変更し、Stuck Stateの引数を追加
 def generate_ai_response(
-    llm_context_json: str,
-    tool: str,
-    extra_materials: str | None = None,
-) -> str:
+    llm_context_json: str,              # build_llm_context() が返す JSON 文字列
+    tool: str,                          # 使用されたツール名
+    time_since_last_cmd: float = 0.0,  # 前回コマンドからの経過秒数
+    is_help_request: bool = False,      # ヘルプフラグ包含判定結果
+    extra_materials: str | None = None, # 将来的な外部講義資料テキスト（任意）
+) -> dict:
     """
     OpenAI API を呼び出してレッスン主導型の AI 解説を生成する。
 
     Parameters
     ----------
-    llm_context_json : build_llm_context() が返す JSON 文字列
-    tool             : 使用されたツール名
-    extra_materials  : 将来的に挿入する外部講義資料テキスト（任意）
+    llm_context_json    : build_llm_context() が返す JSON 文字列
+    tool                : 使用されたツール名
+    time_since_last_cmd : 前回コマンドからの経過秒数
+    is_help_request     : ヘルプフラグ包含判定結果
+    extra_materials     : 将来的に挿入する外部講義資料テキスト（任意）
 
     Returns
     -------
-    AI チューターからの解説文字列
+    dict : {"message": str, "highlights": list[str]}
     """
     try:
-        context = json.loads(llm_context_json)
-        current_step = context.get("current_step", "不明なステップ")
-        user_selected_options = context.get("user_selected_options", [])
-        execution_result = context.get("execution_result", "不明")
+        context = json.loads(llm_context_json)                          # JSON文字列をdictに変換
+        current_step = context.get("current_step", "不明なステップ")    # 学習ステップ名を取得
+        user_selected_options = context.get("user_selected_options", [])  # オプション一覧を取得
+        execution_result = context.get("execution_result", "不明")     # 実行結果文字列を取得
+        exit_code = context.get("exit_code", 0)                        # 数値の終了コードを取得
+        stdout = context.get("stdout", "")                             # 標準出力テキストを取得
+        stderr = context.get("stderr", "")                             # 標準エラー出力テキストを取得
 
+        # ▼▼▼変更箇所▼▼▼ build_system_prompt に Stuck State情報 と stdout/stderr を渡す
         system_prompt = build_system_prompt(
             current_step=current_step,
             user_selected_options=user_selected_options,
             execution_result=execution_result,
+            exit_code=exit_code,
+            stdout=stdout,
+            stderr=stderr,
+            time_since_last_cmd=time_since_last_cmd,
+            is_help_request=is_help_request,
             extra_materials=extra_materials,
         )
 
         user_message = (
-            f"ツール「{tool}」を使って上記のコマンドを実行しました。"
-            f"実行結果は「{execution_result}」です。"
+            f"ツール「{tool}」を使って上記のコマンドを実行しました。\n"
+            f"実行結果は「{execution_result}」です。\n"
+            f"標準出力: {'(出力あり)' if stdout else '(なし)'}\n"
+            f"標準エラー: {'(出力あり)' if stderr else '(なし)'}\n"
             f"学習の指針に従い、簡潔にフィードバックをしてください。"
         )
 
@@ -305,20 +476,29 @@ def generate_ai_response(
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_message},
             ],
+            response_format={"type": "json_object"},  # ▼▼▼変更箇所▼▼▼ JSON出力を強制
             max_tokens=200,
             temperature=0.7,
         )
 
         ai_text = response.choices[0].message.content.strip()
         logger.info(f"OpenAI response received: {ai_text[:80]}...")
-        return ai_text
+        
+        # ▼▼▼変更箇所▼▼▼ JSON文字列をパースして dict として返す
+        try:
+            return json.loads(ai_text)
+        except json.JSONDecodeError:
+            return {"message": ai_text, "highlights": []}
 
     except APITimeoutError as e:
-        logger.error(f"[OpenAI] タイムアウト: コンテナから api.openai.com への疎通を確認してください: {e}")
-        return "⏱️ AI チューターへの接続がタイムアウトしました。ネットワーク設定を確認してください。"
+        logger.error(f"[OpenAI] タイムアウト: {e}")
+        return {"message": "⏱️ AI チューターへの接続がタイムアウトしました。ネットワーク設定を確認してください。", "highlights": []}
     except AuthenticationError as e:
-        logger.error(f"[OpenAI] 認証エラー: OPENAI_API_KEY が正しく設定されているか確認してください: {e}")
-        return "🔑 APIキーが無効です。環境変数 OPENAI_API_KEY を確認してください。"
+        logger.error(f"[OpenAI] 認証エラー: {e}")
+        return {"message": "🔑 APIキーが無効です。環境変数 OPENAI_API_KEY を確認してください。", "highlights": []}
     except APIConnectionError as e:
-        logger.error(f"[OpenAI] 接続エラー: コンテナからインターネットへの疎通がない可能性があります: {e}")
-        return "🌐 AI チューターへの接続に失敗しました。コンテナのネットワーク設定を確認してください。"
+        logger.error(f"[OpenAI] 接続エラー: {e}")
+        return {"message": "🌐 AI チューターへの接続に失敗しました。コンテナのネットワーク設定を確認してください。", "highlights": []}
+    except Exception as e:
+        logger.error(f"[OpenAI] 予期せぬエラー: {e}")
+        return {"message": "❌ AI チューターの処理中にエラーが発生しました。", "highlights": []}

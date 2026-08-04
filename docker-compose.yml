@@ -8,6 +8,7 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./frontend:/frontend   # main.py が ../frontend (=/frontend) を参照するためマウント
+      - ./backend:/app         # バックエンドのソースコードをマウントして変更を即時反映（開発用）
       # ▼▼▼変更箇所▼▼▼ SQLite DB ファイルを名前付きボリュームに永続化（コンテナ再起動後もデータが消えない）
       - db_data:/app/data
     environment:
@@ -29,6 +30,7 @@ services:
 
   iperf3-server:
     image: networkstatic/iperf3
+    platform: linux/amd64
     command: -s
     ports:
       - "5201:5201"
