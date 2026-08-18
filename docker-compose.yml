@@ -32,15 +32,17 @@ services:
     image: networkstatic/iperf3
     platform: linux/amd64
     command: -s
-    ports:
-      - "5201:5201"
+    # ▼ UFWバイパス防止: ホスト側への公開を廃止。backendからは "iperf3-server:5201" でアクセス可能
+    # ports:
+    #   - "5201:5201"
     container_name: iperf3-server
 
   dummy-web:
     image: nginx:latest
     container_name: dummy-web
-    ports:
-      - "8080:80"
+    # ▼ UFWバイパス防止: ホスト側への公開を廃止。backendからは "dummy-web:80" でアクセス可能
+    # ports:
+    #   - "8080:80"
 
   # ▼▼▼変更箇所▼▼▼ ── やられ環境コンテナ（学習用ターゲット群）─────────────────────────────
 
@@ -51,8 +53,9 @@ services:
     container_name: dvwa                    # バックエンドから "dvwa" というホスト名でアクセス可能にする
     # ▼▼▼変更箇所▼▼▼ Apple Silicon (arm64) Mac では x86_64 専用イメージを Rosetta2 経由で実行するため指定
     platform: linux/amd64                   # x86_64 イメージを ARM Mac 上でエミュレート実行
-    ports:
-      - "8081:80"                           # ホスト 8081 → コンテナ 80 (HTTP) にマッピング
+    # ▼ UFWバイパス防止: ホスト側への公開を廃止。backendからは "dvwa:80" でアクセス可能
+    # ports:
+    #   - "8081:80"                         # ホスト 8081 → コンテナ 80 (HTTP) にマッピング
 
   metasploitable:
     # Metasploitable2
@@ -62,10 +65,11 @@ services:
     container_name: metasploitable          # バックエンドから "metasploitable" で名前解決できる
     # ▼▼▼変更箇所▼▼▼ Apple Silicon (arm64) Mac では x86_64 専用イメージを Rosetta2 経由で実行するため指定
     platform: linux/amd64                   # x86_64 イメージを ARM Mac 上でエミュレート実行
-    ports:
-      - "2222:22"                           # SSH  : ホスト 2222 → コンテナ 22
-      - "2121:21"                           # FTP  : ホスト 2121 → コンテナ 21
-      - "8082:80"                           # HTTP : ホスト 8082 → コンテナ 80
+    # ▼ UFWバイパス防止: ホスト側への公開を廃止。backendからはコンテナ名で全ポートにアクセス可能
+    # ports:
+    #   - "2222:22"                         # SSH  : ホスト 2222 → コンテナ 22
+    #   - "2121:21"                         # FTP  : ホスト 2121 → コンテナ 21
+    #   - "8082:80"                         # HTTP : ホスト 8082 → コンテナ 80
     tty: true                               # 一部のサービス起動に擬似 TTY が必要なため有効化
 
   mysql:
@@ -75,8 +79,9 @@ services:
     container_name: mysql                   # バックエンドから "mysql" で名前解決できる
     # ▼▼▼変更箇所▼▼▼ Apple Silicon (arm64) Mac では x86_64 専用イメージを Rosetta2 経由で実行するため指定
     platform: linux/amd64                   # x86_64 イメージを ARM Mac 上でエミュレート実行
-    ports:
-      - "3306:3306"                         # MySQL : ホスト 3306 → コンテナ 3306
+    # ▼ UFWバイパス防止: ホスト側への公開を廃止。backendからは "mysql:3306" でアクセス可能
+    # ports:
+    #   - "3306:3306"                       # MySQL : ホスト 3306 → コンテナ 3306
     environment:
       MYSQL_ROOT_PASSWORD: password         # root ユーザーのパスワード（推測しやすい値で演習用）
       MYSQL_DATABASE: dvwa                  # 起動時に "dvwa" データベースを自動作成
