@@ -39,15 +39,43 @@
       overflow: hidden;
       gap: 0;
     }
+    /* ─── Resizable Pane Divider ─── */
+    .pane-divider {
+      width: 5px;
+      background: var(--border);
+      cursor: col-resize;
+      flex-shrink: 0;
+      transition: background 0.15s;
+      position: relative;
+      z-index: 10;
+    }
+    .pane-divider:hover,
+    .pane-divider.dragging {
+      background: var(--accent);
+    }
+    .pane-divider::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 2px;
+      height: 32px;
+      border-radius: 2px;
+      background: var(--muted);
+      opacity: 0.5;
+    }
     /* ─── Left Panel: Options ─── */
     .left-panel {
-      width: 320px;
-      min-width: 260px;
+      width: 300px;
+      min-width: 200px;
+      max-width: 600px;
       background: var(--surface);
-      border-right: 1px solid var(--border);
+      border-right: none;
       overflow-y: auto;
       display: flex;
       flex-direction: column;
+      flex-shrink: 0;
     }
     .panel-header {
       padding: 0.75rem 1rem;
@@ -122,18 +150,28 @@
     .run-btn:hover { opacity: 0.85; }
     .run-btn:active { transform: scale(0.98); }
     .run-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-    /* ─── Right Panel ─── */
-    .right-panel {
+    /* ─── Center Panel: Terminal + AI ─── */
+    .center-panel {
       flex: 1;
+      min-width: 280px;
       display: flex;
       flex-direction: column;
       overflow: hidden;
+      background: var(--terminal-bg);
+    }
+    /* ─── Right Panel: PDF ─── */
+    .right-panel {
+      width: 480px;
+      min-width: 220px;
+      max-width: 1200px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      flex-shrink: 0;
     }
     /* Terminal */
     .terminal-pane {
-      flex: 1;
       background: var(--terminal-bg);
-      border-bottom: 1px solid var(--border);
       display: flex;
       flex-direction: column;
       overflow: hidden;
@@ -179,12 +217,13 @@
     @keyframes blink { 0%, 80%, 100% { opacity: 0; } 40% { opacity: 1; } }
     /* AI Pane */
     .ai-pane {
-      height: 220px;
-      background: var(--surface);
+      height: 170px;
+      background: #0f141b;
       display: flex;
       flex-direction: column;
       overflow: hidden;
       flex-shrink: 0;
+      border-top: 1px solid var(--border);
     }
     .ai-header {
       padding: 0.6rem 1rem;
@@ -218,6 +257,259 @@
       color: var(--terminal-cyan);
     }
     .ai-placeholder { color: var(--muted); font-style: italic; font-size: 0.8rem; }
+    .session-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      font-size: 0.72rem;
+      color: var(--muted);
+      border: 1px solid var(--border);
+      background: #0d1117;
+      border-radius: 999px;
+      padding: 0.28rem 0.65rem;
+    }
+    .ghost-btn {
+      border: 1px solid var(--border);
+      background: #0d1117;
+      color: var(--text);
+      border-radius: 999px;
+      padding: 0.38rem 0.75rem;
+      font-size: 0.75rem;
+      cursor: pointer;
+      transition: border-color 0.2s, color 0.2s, background 0.2s;
+    }
+    .ghost-btn:hover {
+      border-color: var(--accent);
+      color: #fff;
+    }
+    .materials-pane {
+      background:
+        radial-gradient(circle at top, rgba(88, 166, 255, 0.12), transparent 42%),
+        linear-gradient(180deg, #161b22 0%, #11161d 100%);
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      overflow: hidden;
+    }
+    .materials-toolbar {
+      padding: 0.7rem 0.9rem;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: 0.55rem;
+    }
+    .materials-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+    #materialSelector {
+      text-overflow: ellipsis;
+      overflow: hidden;
+      white-space: nowrap;
+    }
+    .materials-title {
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+    }
+    .materials-title strong {
+      font-size: 0.9rem;
+      letter-spacing: 0.02em;
+    }
+    .materials-title span {
+      font-size: 0.74rem;
+      color: var(--muted);
+    }
+    .materials-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      flex-wrap: wrap;
+    }
+    .materials-actions .compact-btn {
+      width: auto;
+      padding: 0.5rem 0.85rem;
+      font-size: 0.82rem;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #1f6feb, #58a6ff);
+    }
+    .materials-actions .compact-btn:hover {
+      opacity: 0.9;
+    }
+    .materials-actions input[type="file"] {
+      flex: 1;
+      min-width: 220px;
+      font-size: 0.78rem;
+      color: var(--muted);
+    }
+    .materials-actions input[type="file"]::file-selector-button {
+      border: 1px solid var(--border);
+      background: #21262d;
+      color: var(--text);
+      border-radius: 6px;
+      padding: 0.45rem 0.7rem;
+      margin-right: 0.65rem;
+      cursor: pointer;
+    }
+    .materials-status {
+      font-size: 0.74rem;
+      color: var(--muted);
+      min-height: 1.1rem;
+    }
+    .materials-viewer {
+      flex: 1;
+      min-height: 0;
+      padding: 0.75rem 0.9rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+    }
+    .materials-frame {
+      flex: 1;
+      width: 100%;
+      min-height: 520px;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: rgba(13, 17, 23, 0.9);
+      overflow: hidden;
+    }
+    .materials-placeholder {
+      flex: 1;
+      border: 1px dashed rgba(121, 192, 255, 0.4);
+      border-radius: 14px;
+      background: rgba(10, 12, 16, 0.65);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 1.5rem;
+      color: var(--muted);
+      line-height: 1.8;
+      min-height: 320px;
+    }
+    .materials-links {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+    .materials-links a {
+      color: var(--terminal-cyan);
+      text-decoration: none;
+    }
+    .materials-links a:hover {
+      text-decoration: underline;
+    }
+    /* ─── PDF Zoom Controls ─── */
+    .pdf-zoom-bar {
+      display: none;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.35rem 0.75rem;
+      background: #1c2128;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      flex-shrink: 0;
+    }
+    .pdf-zoom-bar.visible {
+      display: flex;
+    }
+    .pdf-zoom-btn {
+      width: 28px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #21262d;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-size: 1rem;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+      flex-shrink: 0;
+    }
+    .pdf-zoom-btn:hover {
+      background: #30363d;
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+    .pdf-zoom-scale {
+      min-width: 48px;
+      text-align: center;
+      font-size: 0.78rem;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--text);
+      background: #0d1117;
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      padding: 0.2rem 0.4rem;
+    }
+    .pdf-zoom-label {
+      font-size: 0.72rem;
+      color: var(--muted);
+      margin-left: 0.25rem;
+    }
+    /* ─── PDF Scroll Wrapper ─── */
+    .pdf-scroll-wrapper {
+      flex: 1;
+      overflow: auto;
+      min-height: 0;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: rgba(13, 17, 23, 0.9);
+      position: relative;
+    }
+    .pdf-iframe-wrapper {
+      transform-origin: top left;
+      /* width/height controlled by JS */
+    }
+    .pdf-iframe-wrapper iframe {
+      display: block;
+      border: none;
+      width: 100%;
+      height: 100%;
+    }
+    @media (max-width: 900px) {
+      body {
+        height: auto;
+        min-height: 100vh;
+        overflow: auto;
+      }
+      .workspace {
+        flex-direction: column;
+        overflow: visible;
+      }
+      .left-panel {
+        width: 100% !important;
+        min-width: 0;
+        max-height: none;
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+      }
+      .center-panel {
+        min-height: 420px;
+        min-width: 0;
+      }
+      .right-panel {
+        width: 100% !important;
+        min-width: 0;
+      }
+      .pane-divider {
+        width: 100%;
+        height: 5px;
+        cursor: row-resize;
+      }
+      .ai-pane {
+        height: 240px;
+      }
+    }
     /* ▼▼▼変更箇所▼▼▼ ターミナルハイライト用 CSS クラス */
     /* AI が指定したキーワードをターミナル出力中で皜色等で強調表示するためのクラス。   */
     /* 分割注意効果を防ぎ、学生の視線をAIの解説とターミナルの間で分散させない効果。 */
@@ -237,27 +529,30 @@
   </style>
 </head>
 <body>
-  <header class="flex flex-col gap-3 bg-[#161b22] border-b border-[#30363d] px-6 py-4 flex-shrink-0">
-    <div class="flex items-center w-full">
-      <h1 class="text-lg font-bold text-[#58a6ff] tracking-wide">⚡ CUI Learning WebUI</h1>
-      <span class="ml-4 text-xs text-[#8b949e] bg-[#21262d] px-2 py-0.5 rounded-full border border-[#30363d]">MVP v0.1</span>
-      <span id="backendStatus" class="ml-auto text-sm text-[#8b949e]">● Backend: 確認中…</span>
-    </div>
-    
-    <!-- PTES Lesson Stepper -->
-    <div class="w-full mt-1">
-      <div class="flex items-center justify-between">
-        <button onclick="setStep('Step 1')" id="btn-step-1" class="step-btn flex-1 pb-2 text-center text-sm font-semibold border-b-2 border-[#58a6ff] text-[#58a6ff] transition-all">Step 1. 情報収集 (Nmap等)</button>
-        <button onclick="setStep('Step 2')" id="btn-step-2" class="step-btn flex-1 pb-2 text-center text-sm font-semibold border-b-2 border-[#30363d] text-[#8b949e] hover:text-[#c9d1d9] transition-all">Step 2. 脆弱性スキャン</button>
-        <button onclick="setStep('Step 3')" id="btn-step-3" class="step-btn flex-1 pb-2 text-center text-sm font-semibold border-b-2 border-[#30363d] text-[#8b949e] hover:text-[#c9d1d9] transition-all">Step 3. エクスプロイト</button>
-        <button onclick="setStep('Step 4')" id="btn-step-4" class="step-btn flex-1 pb-2 text-center text-sm font-semibold border-b-2 border-[#30363d] text-[#8b949e] hover:text-[#c9d1d9] transition-all">Step 4. ポストエクスプロイト</button>
+  <header class="flex flex-col gap-0 bg-[#161b22] border-b border-[#30363d] flex-shrink-0">
+    <!-- 最上段: タイトル・状態保持・リセット・バックエンド状態 -->
+    <div class="flex items-center gap-3 px-5 py-2 border-b border-[#30363d] flex-wrap">
+      <h1 class="text-base font-bold text-[#58a6ff] tracking-wide whitespace-nowrap">⚡ CUI Learning WebUI</h1>
+      <span class="text-xs text-[#8b949e] bg-[#21262d] px-2 py-0.5 rounded-full border border-[#30363d] whitespace-nowrap">MVP v0.1</span>
+      <div class="session-pill whitespace-nowrap">
+        <span>状態保持</span>
+        <span id="sessionStatus">保存待ち</span>
       </div>
+      <button class="ghost-btn whitespace-nowrap" type="button" onclick="resetLearningState()">学習状態をリセット</button>
+      <span id="backendStatus" class="ml-auto text-sm text-[#8b949e] whitespace-nowrap">● Backend: 確認中…</span>
+    </div>
+    <!-- PTES Lesson Stepper -->
+    <div class="flex items-center justify-between">
+      <button onclick="setStep('Step 1')" id="btn-step-1" class="step-btn flex-1 py-2 text-center text-sm font-semibold border-b-2 border-[#58a6ff] text-[#58a6ff] transition-all">Step 1. 情報収集 (Nmap等)</button>
+      <button onclick="setStep('Step 2')" id="btn-step-2" class="step-btn flex-1 py-2 text-center text-sm font-semibold border-b-2 border-[#30363d] text-[#8b949e] hover:text-[#c9d1d9] transition-all">Step 2. 脆弱性スキャン</button>
+      <button onclick="setStep('Step 3')" id="btn-step-3" class="step-btn flex-1 py-2 text-center text-sm font-semibold border-b-2 border-[#30363d] text-[#8b949e] hover:text-[#c9d1d9] transition-all">Step 3. エクスプロイト</button>
+      <button onclick="setStep('Step 4')" id="btn-step-4" class="step-btn flex-1 py-2 text-center text-sm font-semibold border-b-2 border-[#30363d] text-[#8b949e] hover:text-[#c9d1d9] transition-all">Step 4. ポストエクスプロイト</button>
     </div>
   </header>
 
-  <div class="workspace">
+  <div class="workspace" id="workspace">
     <!-- ══ 左ペイン: オプション選択 ══ -->
-    <aside class="left-panel flex flex-col h-full overflow-hidden">
+    <aside class="left-panel flex flex-col h-full overflow-hidden" id="leftPanel">
       <div class="panel-header flex-shrink-0"><span class="dot"></span>ツール & オプション設定</div>
       
       <!-- ツール切り替え -->
@@ -662,10 +957,13 @@
       </div>
     </aside>
 
-    <!-- ══ 右ペイン ══ -->
-    <div class="right-panel">
+    <!-- ══ セパレーター1: 左|中央 ══ -->
+    <div class="pane-divider" id="divider1"></div>
+
+    <!-- ══ 中央ペイン: ターミナル + AI解説 ══ -->
+    <div class="center-panel" id="centerPanel">
       <!-- ターミナル風出力 -->
-      <div class="terminal-pane">
+      <div class="terminal-pane" style="flex:1;">
         <div class="terminal-header">
           <div class="traffic-light tl-red"></div>
           <div class="traffic-light tl-yellow"></div>
@@ -679,7 +977,7 @@
         </div>
       </div>
 
-      <!-- AI解説エリア -->
+      <!-- AI解説エリア（中央カラム下部に固定） -->
       <div class="ai-pane">
         <div class="ai-header" style="justify-content: space-between;">
           <div style="display: flex; align-items: center; gap: 0.5rem;">
@@ -688,7 +986,6 @@
           </div>
           <div style="display: flex; align-items: center; gap: 0.5rem;">
             <span id="aiPaneHeaderStep" style="font-size: 0.75rem; color: var(--accent); font-weight: bold;">Step 1. 情報収集 (Nmap等)</span>
-            <!-- Hidden input to keep compatibility with JS -->
             <input type="hidden" id="currentStep" value="Step 1" />
           </div>
         </div>
@@ -697,255 +994,434 @@
         </div>
       </div>
     </div>
+
+    <!-- ══ セパレーター2: 中央|右 ══ -->
+    <div class="pane-divider" id="divider2"></div>
+
+    <!-- ══ 右ペイン: PDF ══ -->
+    <div class="right-panel" id="rightPanel">
+      <aside class="materials-pane" style="flex:1; display:flex; flex-direction:column; min-height:0; overflow:hidden;">
+        <div class="materials-toolbar">
+          <div class="materials-meta">
+            <div class="materials-title">
+              <strong>講義資料ビューア</strong>
+              <span>PDFをアップロードして、そのまま見ながら操作できます。</span>
+            </div>
+            <select id="materialSelector" class="max-w-[340px]">
+              <option value="">資料を選択してください</option>
+            </select>
+          </div>
+          <div class="materials-actions">
+            <input type="file" id="materialUpload" accept="application/pdf" />
+            <button class="run-btn compact-btn" type="button" onclick="uploadMaterial()">アップロード</button>
+          </div>
+          <div id="materialStatus" class="materials-status">講義PDFを登録すると、ここからいつでも参照できます。</div>
+        </div>
+        <div class="materials-viewer">
+          <div id="materialPlaceholder" class="materials-placeholder">
+            講義資料が未選択です。<br />
+            PDFをアップロードすると右側にそのまま表示されます。
+          </div>
+          <!-- PDF zoom コントロールバー -->
+          <div class="pdf-zoom-bar" id="pdfZoomBar">
+            <button class="pdf-zoom-btn" id="pdfZoomOut" title="縮小" onclick="adjustPdfZoom(-0.1)">&#8722;</button>
+            <span class="pdf-zoom-scale" id="pdfZoomScale">100%</span>
+            <button class="pdf-zoom-btn" id="pdfZoomIn" title="拡大" onclick="adjustPdfZoom(0.1)">&#43;</button>
+            <button class="pdf-zoom-btn" id="pdfZoomReset" title="リセット" onclick="setPdfZoom(1)" style="font-size:0.7rem; width:auto; padding:0 0.5rem;">Reset</button>
+            <span class="pdf-zoom-label">マウスホイールでも拡縮可</span>
+          </div>
+          <!-- PDF スクロールラッパー -->
+          <div class="pdf-scroll-wrapper hidden" id="pdfScrollWrapper">
+            <div class="pdf-iframe-wrapper" id="pdfIframeWrapper">
+              <iframe id="materialViewer" title="講義資料PDFビューア"></iframe>
+            </div>
+          </div>
+          <div class="materials-links">
+            <span id="materialMeta">表示中の資料はありません。</span>
+            <a id="materialOpenLink" href="#" target="_blank" rel="noopener" class="hidden">別タブで開く</a>
+          </div>
+        </div>
+      </aside>
+    </div>
   </div>
 
   <script>
-    const API_BASE = "http://localhost:8000";
-
-    // ─── コマンドプレビューのリアルタイム更新 ───
+    const API_BASE = window.location.origin && window.location.origin !== "null"
+      ? window.location.origin
+      : "http://localhost:8000";
+    const UI_STATE_KEY = "cui_ui_state_v2";
+    const SESSION_ID_KEY = "cui_session_id";
+    const DEFAULT_STEP = "Step 1";
+    const STEP_LABELS = {
+      "Step 1": "Step 1. 情報収集 (Nmap等)",
+      "Step 2": "Step 2. 脆弱性スキャン",
+      "Step 3": "Step 3. エクスプロイト",
+      "Step 4": "Step 4. ポストエクスプロイト",
+    };
+    const STEP_THEME_COLORS = {
+      "Step 1": "var(--accent)",
+      "Step 2": "#e3b341",
+      "Step 3": "#f85149",
+      "Step 4": "#a371f7",
+    };
     const nmapFields = ["target", "scanType", "timing", "portRange", "osDetect", "verbose"];
     const gobusterFields = ["gbTarget", "gbMode", "gbWordlist", "gbQuiet"];
-    // ▼▼▼変更箇所▼▼▼ curlFollowLocation を無効化対象フィールドリストに追加（実行中はフォームをロック）
     const curlFields = ["curlTarget", "curlMethod", "curlHeader", "curlVerbose", "curlFollowLocation"];
-    // ▲▲▲変更箇所ここまで▲▲▲
     const hydraFields = ["hydraTarget", "hydraService", "hydraUser", "hydraWordlist", "hydraUserList"];
     const aircrackFields = ["aircrackTarget", "aircrackWordlist", "aircrackBssid"];
     const iperf3Fields = ["iperf3Target", "iperf3Protocol", "iperf3Time", "iperf3Bandwidth"];
     const msfFields = ["msfModule", "msfRhosts", "msfRport"];
-    [...nmapFields, ...gobusterFields, ...curlFields, ...hydraFields, ...aircrackFields, ...iperf3Fields, ...msfFields].forEach(id => {
-      const el = document.getElementById(id);
-      if (el) el.addEventListener("change", updatePreview);
-      if (el) el.addEventListener("input", updatePreview);
-    });
+    const trackedFieldIds = [
+      "toolSelector",
+      ...nmapFields,
+      ...gobusterFields,
+      ...curlFields,
+      ...hydraFields,
+      ...aircrackFields,
+      ...iperf3Fields,
+      ...msfFields,
+    ];
 
-    // ─── ステップ切り替え処理 ───
-    function setStep(stepVal) {
-      document.getElementById("currentStep").value = stepVal;
-      
-      const buttons = [
-        { id: "btn-step-1", val: "Step 1", text: "Step 1. 情報収集 (Nmap等)" },
-        { id: "btn-step-2", val: "Step 2", text: "Step 2. 脆弱性スキャン" },
-        { id: "btn-step-3", val: "Step 3", text: "Step 3. エクスプロイト" },
-        { id: "btn-step-4", val: "Step 4", text: "Step 4. ポストエクスプロイト" }
-      ];
-      
-      let stepThemeColor = "var(--accent)"; // Default blue
-      if (stepVal === "Step 2") stepThemeColor = "#e3b341"; // Yellow
-      else if (stepVal === "Step 3") stepThemeColor = "#f85149"; // Red
-      else if (stepVal === "Step 4") stepThemeColor = "#a371f7"; // Purple
+    let isBackendConnected = false;
+    let materialsCache = [];
+    let defaultTerminalMarkup = "";
+    let defaultAiMarkup = "";
 
-      buttons.forEach(b => {
-        const btn = document.getElementById(b.id);
-        if (b.val === stepVal) {
-          btn.className = `step-btn flex-1 pb-2 text-center text-sm font-semibold border-b-2 transition-all`;
-          btn.style.borderColor = stepThemeColor;
-          btn.style.color = stepThemeColor;
-          document.getElementById("aiPaneHeaderStep").textContent = b.text;
-          document.getElementById("aiPaneHeaderStep").style.color = stepThemeColor;
-          document.querySelector(".ai-badge").style.background = stepThemeColor;
-        } else {
-          btn.className = `step-btn flex-1 pb-2 text-center text-sm font-semibold border-b-2 border-[#30363d] text-[#8b949e] hover:text-[#c9d1d9] transition-all`;
-          btn.style.borderColor = "";
-          btn.style.color = "";
-        }
-      });
-      
-      // ガイダンスとして推奨ツールを自動選択
-      const toolSelector = document.getElementById("toolSelector");
-      if (stepVal === "Step 1") toolSelector.value = "nmap";
-      else if (stepVal === "Step 2") toolSelector.value = "gobuster";
-      else if (stepVal === "Step 3") toolSelector.value = "hydra";
-      else if (stepVal === "Step 4") toolSelector.value = "iperf3";
-      
-      switchTool();
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
     }
 
-    function switchTool() {
-      const tool = document.getElementById("toolSelector").value;
-      const containers = {
-          "nmap": document.getElementById("nmapOptionsContainer"),
-          "gobuster": document.getElementById("gobusterOptionsContainer"),
-          "curl": document.getElementById("curlOptionsContainer"),
-          "hydra": document.getElementById("hydraOptionsContainer"),
-          "aircrack-ng": document.getElementById("aircrackOptionsContainer"),
-          "iperf3": document.getElementById("iperf3OptionsContainer"),
-          "metasploit": document.getElementById("metasploitOptionsContainer")
-      };
-
-      for (const [key, container] of Object.entries(containers)) {
-          if (key === tool) {
-              container.classList.remove("hidden");
-              container.classList.add("flex");
-          } else {
-              container.classList.add("hidden");
-              container.classList.remove("flex");
-          }
+    function applyHighlights(text, highlights) {
+      let escaped = escapeHtml(text);
+      if (!Array.isArray(highlights) || highlights.length === 0) {
+        return escaped;
       }
-      document.getElementById("termToolName").textContent = tool;
+
+      highlights.forEach(keyword => {
+        if (!keyword || typeof keyword !== "string") return;
+        const escapedKeyword = escapeHtml(keyword).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const regex = new RegExp(escapedKeyword, "gi");
+        escaped = escaped.replace(regex, match => `<span class="terminal-highlight">${match}</span>`);
+      });
+
+      return escaped;
+    }
+
+    function getStoredState() {
+      try {
+        return JSON.parse(localStorage.getItem(UI_STATE_KEY) || "{}");
+      } catch {
+        localStorage.removeItem(UI_STATE_KEY);
+        return {};
+      }
+    }
+
+    function inferRecommendedTool(stepVal) {
+      if (stepVal === "Step 2") return "gobuster";
+      if (stepVal === "Step 3") return "hydra";
+      if (stepVal === "Step 4") return "iperf3";
+      return "nmap";
+    }
+
+    function formatSessionStatus() {
+      const sessionId = localStorage.getItem(SESSION_ID_KEY);
+      const savedState = getStoredState();
+      const statusEl = document.getElementById("sessionStatus");
+
+      if (sessionId) {
+        statusEl.textContent = `復元可: ${sessionId.slice(0, 8)}...`;
+        statusEl.style.color = "#79c0ff";
+        return;
+      }
+
+      if (savedState.savedAt) {
+        statusEl.textContent = "ローカル保存済み";
+        statusEl.style.color = "#3fb950";
+        return;
+      }
+
+      statusEl.textContent = "保存待ち";
+      statusEl.style.color = "var(--muted)";
+    }
+
+    function collectFieldState() {
+      const fields = {};
+      trackedFieldIds.forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        fields[id] = el.type === "checkbox" ? el.checked : el.value;
+      });
+      return fields;
+    }
+
+    function saveUiState(extraState = {}) {
+      const nextState = {
+        ...getStoredState(),
+        fields: collectFieldState(),
+        currentStep: document.getElementById("currentStep").value,
+        terminalHtml: document.getElementById("terminalBody").innerHTML,
+        aiHtml: document.getElementById("aiBody").innerHTML,
+        selectedMaterial: document.getElementById("materialSelector").value || "",
+        savedAt: new Date().toISOString(),
+        ...extraState,
+      };
+      localStorage.setItem(UI_STATE_KEY, JSON.stringify(nextState));
+      formatSessionStatus();
+    }
+
+    function attachStateListeners() {
+      trackedFieldIds.forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.addEventListener("change", () => {
+          updatePreview();
+          saveUiState();
+        });
+        el.addEventListener("input", () => {
+          updatePreview();
+          saveUiState();
+        });
+      });
+
+      document.getElementById("materialSelector").addEventListener("change", event => {
+        selectMaterial(event.target.value);
+      });
+    }
+
+    function restoreUiState() {
+      const state = getStoredState();
+      const fields = state.fields || {};
+
+      Object.entries(fields).forEach(([id, value]) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        if (el.type === "checkbox") {
+          el.checked = Boolean(value);
+        } else {
+          el.value = value;
+        }
+      });
+
+      const stepToRestore = state.currentStep || DEFAULT_STEP;
+      setStep(stepToRestore, { autoSelectTool: false, persist: false });
+
+      const toolSelector = document.getElementById("toolSelector");
+      toolSelector.value = fields.toolSelector || toolSelector.value || inferRecommendedTool(stepToRestore);
+      switchTool({ persist: false });
+
+      document.getElementById("terminalBody").innerHTML = state.terminalHtml || defaultTerminalMarkup;
+      document.getElementById("aiBody").innerHTML = state.aiHtml || defaultAiMarkup;
+      formatSessionStatus();
       updatePreview();
     }
 
-    function buildCommandParts() {
-      const tool = document.getElementById("toolSelector").value;
-      if (tool === "nmap") {
-          const target   = document.getElementById("target").value.trim() || "TARGET";
-          const scanType = document.getElementById("scanType").value;
-          const timing   = document.getElementById("timing").value;
-          const portRange= document.getElementById("portRange").value.trim();
-          const osDetect = document.getElementById("osDetect").checked;
-          const verbose  = document.getElementById("verbose").checked;
-
-          const flags = [scanType, timing];
-          if (osDetect) flags.push("-O");
-          if (verbose)  flags.push("-v");
-          if (portRange) flags.push("-p", portRange);
-
-          return { tool, target, flags };
-      } else if (tool === "gobuster") {
-          const target = document.getElementById("gbTarget").value.trim() || "URL";
-          const mode = document.getElementById("gbMode").value;
-          const wordlist = document.getElementById("gbWordlist").value;
-          const quiet = document.getElementById("gbQuiet").checked;
-          
-          const flags = [mode, "-u", target, "-w", wordlist];
-          if (quiet) flags.push("-q");
-          return { tool, target, flags };
-      } else if (tool === "curl") {
-          const target = document.getElementById("curlTarget").value.trim() || "URL";  // ターゲット URL を取得
-          const method = document.getElementById("curlMethod").value;                  // HTTP メソッドを取得
-          const header = document.getElementById("curlHeader").value.trim();           // 追加ヘッダーを取得
-          const verbose = document.getElementById("curlVerbose").checked;              // -v チェック状態を取得
-          // ▼▼▼変更箇所▼▼▼ -L チェックボックスの状態を取得してプレビューに反映
-          const followLocation = document.getElementById("curlFollowLocation").checked; // -L チェック状態を取得
-          // ▲▲▲変更箇所ここまで▲▲▲
-
-          const flags = [];                                                             // コマンドフラグのリスト
-          if (method !== "GET") flags.push("-X", method);                             // GET 以外なら -X を追加
-          if (header) flags.push("-H", `"${header}"`);                               // ヘッダーがあれば -H を追加
-          if (verbose) flags.push("-v");                                              // verbose が有効なら -v を追加
-          // ▼▼▼変更箇所▼▼▼ -L フラグをプレビューのフラグ配列に追加
-          if (followLocation) flags.push("-L");                                       // リダイレクト追従が有効なら -L を追加
-          // ▲▲▲変更箇所ここまで▲▲▲
-
-          return { tool, target, flags };
-      } else if (tool === "hydra") {
-          const target = document.getElementById("hydraTarget").value.trim() || "127.0.0.1";
-          const service = document.getElementById("hydraService").value;
-          const user = document.getElementById("hydraUser").value.trim() || "admin";
-          const isUserList = document.getElementById("hydraUserList").checked;
-          const wordlist = document.getElementById("hydraWordlist").value;
-          
-          const flags = [];
-          if (isUserList) flags.push("-L", user);
-          else flags.push("-l", user);
-          
-          flags.push("-P", wordlist);
-          flags.push(target, service);
-          return { tool, target, flags };
-      } else if (tool === "aircrack-ng") {
-          const target = document.getElementById("aircrackTarget").value.trim() || "/usr/share/wordlists/wpa.cap";
-          const wordlist = document.getElementById("aircrackWordlist").value;
-          const bssid = document.getElementById("aircrackBssid").value.trim();
-          
-          const flags = ["-w", wordlist];
-          if (bssid) flags.push("-b", bssid);
-          flags.push(target);
-          return { tool, target, flags };
-      } else if (tool === "iperf3") {
-          const target = document.getElementById("iperf3Target").value.trim() || "iperf3-server";
-          const protocol = document.getElementById("iperf3Protocol").value;
-          const time = document.getElementById("iperf3Time").value;
-          const bandwidth = document.getElementById("iperf3Bandwidth").value.trim();
-          
-          const flags = ["-c", target];
-          if (protocol === "udp") flags.push("-u");
-          if (time) flags.push("-t", time);
-          if (bandwidth) flags.push("-b", bandwidth);
-          return { tool, target, flags };
-      } else if (tool === "metasploit") {
-          const module = document.getElementById("msfModule").value;
-          const rhosts = document.getElementById("msfRhosts").value.trim() || "127.0.0.1";
-          const rport = document.getElementById("msfRport").value.trim();
-          
-          let script = `use ${module}; set RHOSTS ${rhosts}; `;
-          if (rport) script += `set RPORT ${rport}; `;
-          script += "run; exit";
-          
-          const flags = ["-q", "-x", `"${script}"`];
-          return { tool, target: rhosts, flags };
-      }
-    }
-
-    function updatePreview() {
-      const { tool, target, flags } = buildCommandParts();
-      const preview = document.getElementById("cmdPreview");
-      
-      if (tool === "nmap") {
-          preview.innerHTML =
-            `<span class="cmd-name">nmap</span>` +
-            flags.map(f => `<span class="cmd-flag"> ${f}</span>`).join("") +
-            `<span class="cmd-target"> ${target}</span>`;
-      } else if (tool === "gobuster") {
-          preview.innerHTML =
-            `<span class="cmd-name">gobuster</span>` +
-            flags.map(f => {
-                if (f === target) return `<span class="cmd-target"> ${f}</span>`;
-                return `<span class="cmd-flag"> ${f}</span>`;
-            }).join("");
-      } else if (tool === "curl") {
-          preview.innerHTML =
-            `<span class="cmd-name">curl</span>` +
-            flags.map(f => `<span class="cmd-flag"> ${f}</span>`).join("") +
-            `<span class="cmd-target"> ${target}</span>`;
-      } else if (tool === "hydra") {
-          preview.innerHTML =
-            `<span class="cmd-name">hydra</span>` +
-            flags.map(f => {
-                if (f === target) return `<span class="cmd-target"> ${f}</span>`;
-                return `<span class="cmd-flag"> ${f}</span>`;
-            }).join("");
-      } else if (tool === "aircrack-ng") {
-          preview.innerHTML =
-            `<span class="cmd-name">aircrack-ng</span>` +
-            flags.map(f => {
-                if (f === target) return `<span class="cmd-target"> ${f}</span>`;
-                return `<span class="cmd-flag"> ${f}</span>`;
-            }).join("");
-      } else if (tool === "iperf3") {
-          preview.innerHTML =
-            `<span class="cmd-name">iperf3</span>` +
-            flags.map(f => {
-                if (f === target) return `<span class="cmd-target"> ${f}</span>`;
-                return `<span class="cmd-flag"> ${f}</span>`;
-            }).join("");
-      } else if (tool === "metasploit") {
-          preview.innerHTML =
-            `<span class="cmd-name">msfconsole</span>` +
-            flags.map(f => {
-                return `<span class="cmd-flag"> ${escapeHtml(f)}</span>`;
-            }).join("");
-      }
-    }
-
-    // ─── バックエンド疎通確認 ───
     async function checkBackend() {
       const statusEl = document.getElementById("backendStatus");
       try {
         const res = await fetch(`${API_BASE}/api/health`, { signal: AbortSignal.timeout(3000) });
-        if (res.ok) {
-          statusEl.textContent = "● Backend: 接続OK";
-          statusEl.style.color = "#3fb950";
-        } else {
-          throw new Error();
-        }
+        if (!res.ok) throw new Error();
+        statusEl.textContent = "● Backend: 接続OK";
+        statusEl.style.color = "#3fb950";
+        isBackendConnected = true;
       } catch {
         statusEl.textContent = "● Backend: 未接続";
         statusEl.style.color = "#f85149";
+        isBackendConnected = false;
+      }
+
+      document.getElementById("materialUpload").disabled = !isBackendConnected;
+      document.getElementById("materialSelector").disabled = !isBackendConnected;
+      if (!isBackendConnected) {
+        setMaterialStatus("バックエンド未接続のため、PDF一覧の取得とアップロードは停止しています。", true);
+      }
+
+      return isBackendConnected;
+    }
+
+    async function hydrateSessionStepFromServer() {
+      const sessionId = localStorage.getItem(SESSION_ID_KEY);
+      const state = getStoredState();
+      if (!sessionId || state.currentStep || !isBackendConnected) return;
+
+      try {
+        const res = await fetch(`${API_BASE}/api/sessions/${sessionId}`, {
+          signal: AbortSignal.timeout(5000),
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        setStep(data.current_step || DEFAULT_STEP, { autoSelectTool: false, persist: false });
+        saveUiState({ currentStep: data.current_step || DEFAULT_STEP });
+      } catch {
       }
     }
-    checkBackend();
 
-    // ─── ターミナル出力ヘルパー ───
+    function setMaterialStatus(message, isError = false) {
+      const statusEl = document.getElementById("materialStatus");
+      statusEl.textContent = message;
+      statusEl.style.color = isError ? "#f85149" : "var(--muted)";
+    }
+
+    function formatBytes(bytes) {
+      if (!bytes) return "0 B";
+      if (bytes < 1024) return `${bytes} B`;
+      if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+      return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    }
+
+    function populateMaterialSelector(preferredFilename = "") {
+      const selector = document.getElementById("materialSelector");
+      selector.innerHTML = `<option value="">資料を選択してください</option>`;
+
+      materialsCache.forEach(material => {
+        const option = document.createElement("option");
+        option.value = material.filename;
+        option.textContent = material.filename;
+        selector.appendChild(option);
+      });
+
+      const storedSelection = preferredFilename || getStoredState().selectedMaterial || "";
+      if (storedSelection && materialsCache.some(material => material.filename === storedSelection)) {
+        selector.value = storedSelection;
+        selectMaterial(storedSelection, { persist: false });
+      } else {
+        selector.value = "";
+        selectMaterial("", { persist: false });
+      }
+    }
+
+    // ─── PDF Zoom ───
+    let currentPdfZoom = 1.0;
+    const PDF_ZOOM_MIN = 0.5;
+    const PDF_ZOOM_MAX = 3.0;
+
+    function setPdfZoom(level) {
+      currentPdfZoom = Math.min(Math.max(level, PDF_ZOOM_MIN), PDF_ZOOM_MAX);
+      currentPdfZoom = Math.round(currentPdfZoom * 100) / 100;
+      const wrapper  = document.getElementById('pdfIframeWrapper');
+      const scrollBox = document.getElementById('pdfScrollWrapper');
+      const label    = document.getElementById('pdfZoomScale');
+      if (!wrapper || !scrollBox) return;
+      label.textContent = Math.round(currentPdfZoom * 100) + '%';
+      const baseW = scrollBox.clientWidth  || 400;
+      const baseH = scrollBox.clientHeight || 600;
+      wrapper.style.width  = baseW + 'px';
+      wrapper.style.height = baseH + 'px';
+      wrapper.style.transform = `scale(${currentPdfZoom})`;
+    }
+
+    function adjustPdfZoom(delta) {
+      setPdfZoom(currentPdfZoom + delta);
+    }
+
+    function selectMaterial(filename, { persist = true } = {}) {
+      const viewer      = document.getElementById('materialViewer');
+      const placeholder = document.getElementById('materialPlaceholder');
+      const meta        = document.getElementById('materialMeta');
+      const link        = document.getElementById('materialOpenLink');
+      const selector    = document.getElementById('materialSelector');
+      const scrollBox   = document.getElementById('pdfScrollWrapper');
+      const zoomBar     = document.getElementById('pdfZoomBar');
+
+      if (!filename) {
+        scrollBox.classList.add('hidden');
+        zoomBar.classList.remove('visible');
+        viewer.removeAttribute('src');
+        placeholder.classList.remove('hidden');
+        meta.textContent = '表示中の資料はありません。';
+        link.classList.add('hidden');
+        if (persist) saveUiState({ selectedMaterial: '' });
+        return;
+      }
+
+      const material = materialsCache.find(item => item.filename === filename);
+      if (!material) {
+        selector.value = '';
+        setMaterialStatus('選択されていた資料が見つからなかったため、表示を解除しました。', true);
+        selectMaterial('', { persist });
+        return;
+      }
+
+      selector.value = material.filename;
+      viewer.src = `${API_BASE}${material.url}`;
+      scrollBox.classList.remove('hidden');
+      zoomBar.classList.add('visible');
+      placeholder.classList.add('hidden');
+      meta.textContent = `${material.filename} / ${formatBytes(material.size)}`;
+      link.href = `${API_BASE}${material.url}`;
+      link.classList.remove('hidden');
+      setMaterialStatus(`表示中: ${material.filename}`);
+      currentPdfZoom = 1.0;
+      requestAnimationFrame(() => setPdfZoom(1.0));
+      if (persist) saveUiState({ selectedMaterial: material.filename });
+    }
+
+
+    async function loadMaterials(preferredFilename = "") {
+      if (!isBackendConnected) return;
+
+      try {
+        const res = await fetch(`${API_BASE}/api/materials`, {
+          signal: AbortSignal.timeout(10000),
+        });
+        if (!res.ok) throw new Error("資料一覧を取得できませんでした。");
+        const data = await res.json();
+        materialsCache = data.materials || [];
+        populateMaterialSelector(preferredFilename);
+
+        if (materialsCache.length === 0) {
+          setMaterialStatus("講義資料はまだ登録されていません。PDFをアップロードしてください。");
+        } else if (!preferredFilename && !getStoredState().selectedMaterial) {
+          setMaterialStatus(`登録済み資料: ${materialsCache.length} 件`);
+        }
+      } catch (error) {
+        setMaterialStatus(error.message || "資料一覧の取得に失敗しました。", true);
+      }
+    }
+
+    async function uploadMaterial() {
+      if (!isBackendConnected) {
+        setMaterialStatus("バックエンドに接続されていないため、アップロードできません。", true);
+        return;
+      }
+
+      const input = document.getElementById("materialUpload");
+      const file = input.files?.[0];
+      if (!file) {
+        setMaterialStatus("アップロードするPDFを選択してください。", true);
+        return;
+      }
+
+      if (!file.name.toLowerCase().endsWith(".pdf")) {
+        setMaterialStatus("PDFファイルのみアップロードできます。", true);
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append("file", file);
+      setMaterialStatus(`アップロード中: ${file.name}`);
+
+      try {
+        const res = await fetch(`${API_BASE}/api/materials/upload`, {
+          method: "POST",
+          body: formData,
+          signal: AbortSignal.timeout(120000),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.detail || "PDFのアップロードに失敗しました。");
+        }
+
+        input.value = "";
+        await loadMaterials(data.material.filename);
+        setMaterialStatus(`アップロード完了: ${data.material.filename}`);
+      } catch (error) {
+        setMaterialStatus(error.message || "PDFのアップロードに失敗しました。", true);
+      }
+    }
+
     function appendTerminal(html) {
       const body = document.getElementById("terminalBody");
       const div = document.createElement("div");
@@ -956,6 +1432,14 @@
 
     function clearTerminal() {
       document.getElementById("terminalBody").innerHTML = "";
+      saveUiState();
+    }
+
+    function resetLearningState() {
+      if (!window.confirm("保存中の学習状態をリセットします。よろしいですか？")) return;
+      localStorage.removeItem(UI_STATE_KEY);
+      localStorage.removeItem(SESSION_ID_KEY);
+      window.location.reload();
     }
 
     function setFormDisabled(disabled) {
@@ -966,35 +1450,193 @@
       });
     }
 
-    // ─── コマンド実行 ───
+    function setStep(stepVal, { autoSelectTool = true, persist = true } = {}) {
+      document.getElementById("currentStep").value = stepVal;
+
+      [
+        { id: "btn-step-1", val: "Step 1", text: STEP_LABELS["Step 1"] },
+        { id: "btn-step-2", val: "Step 2", text: STEP_LABELS["Step 2"] },
+        { id: "btn-step-3", val: "Step 3", text: STEP_LABELS["Step 3"] },
+        { id: "btn-step-4", val: "Step 4", text: STEP_LABELS["Step 4"] },
+      ].forEach(buttonInfo => {
+        const btn = document.getElementById(buttonInfo.id);
+        if (buttonInfo.val === stepVal) {
+          btn.className = "step-btn flex-1 pb-2 text-center text-sm font-semibold border-b-2 transition-all";
+          btn.style.borderColor = STEP_THEME_COLORS[stepVal] || "var(--accent)";
+          btn.style.color = STEP_THEME_COLORS[stepVal] || "var(--accent)";
+          document.getElementById("aiPaneHeaderStep").textContent = buttonInfo.text;
+          document.getElementById("aiPaneHeaderStep").style.color = STEP_THEME_COLORS[stepVal] || "var(--accent)";
+          document.querySelector(".ai-badge").style.background = STEP_THEME_COLORS[stepVal] || "var(--accent)";
+        } else {
+          btn.className = "step-btn flex-1 pb-2 text-center text-sm font-semibold border-b-2 border-[#30363d] text-[#8b949e] hover:text-[#c9d1d9] transition-all";
+          btn.style.borderColor = "";
+          btn.style.color = "";
+        }
+      });
+
+      if (autoSelectTool) {
+        document.getElementById("toolSelector").value = inferRecommendedTool(stepVal);
+        switchTool({ persist: false });
+      } else {
+        updatePreview();
+      }
+
+      if (persist) saveUiState({ currentStep: stepVal });
+    }
+
+    function switchTool({ persist = true } = {}) {
+      const tool = document.getElementById("toolSelector").value;
+      const containers = {
+        "nmap": document.getElementById("nmapOptionsContainer"),
+        "gobuster": document.getElementById("gobusterOptionsContainer"),
+        "curl": document.getElementById("curlOptionsContainer"),
+        "hydra": document.getElementById("hydraOptionsContainer"),
+        "aircrack-ng": document.getElementById("aircrackOptionsContainer"),
+        "iperf3": document.getElementById("iperf3OptionsContainer"),
+        "metasploit": document.getElementById("metasploitOptionsContainer"),
+      };
+
+      Object.entries(containers).forEach(([key, container]) => {
+        if (key === tool) {
+          container.classList.remove("hidden");
+          container.classList.add("flex");
+        } else {
+          container.classList.add("hidden");
+          container.classList.remove("flex");
+        }
+      });
+
+      document.getElementById("termToolName").textContent = tool;
+      updatePreview();
+      if (persist) saveUiState();
+    }
+
+    function buildCommandParts() {
+      const tool = document.getElementById("toolSelector").value;
+
+      if (tool === "nmap") {
+        const target = document.getElementById("target").value.trim() || "TARGET";
+        const scanType = document.getElementById("scanType").value;
+        const timing = document.getElementById("timing").value;
+        const portRange = document.getElementById("portRange").value.trim();
+        const osDetect = document.getElementById("osDetect").checked;
+        const verbose = document.getElementById("verbose").checked;
+        const flags = [scanType, timing];
+        if (osDetect) flags.push("-O");
+        if (verbose) flags.push("-v");
+        if (portRange) flags.push("-p", portRange);
+        return { tool, target, flags };
+      }
+
+      if (tool === "gobuster") {
+        const target = document.getElementById("gbTarget").value.trim() || "URL";
+        const mode = document.getElementById("gbMode").value;
+        const wordlist = document.getElementById("gbWordlist").value;
+        const quiet = document.getElementById("gbQuiet").checked;
+        const flags = [mode, "-u", target, "-w", wordlist];
+        if (quiet) flags.push("-q");
+        return { tool, target, flags };
+      }
+
+      if (tool === "curl") {
+        const target = document.getElementById("curlTarget").value.trim() || "URL";
+        const method = document.getElementById("curlMethod").value;
+        const header = document.getElementById("curlHeader").value.trim();
+        const verbose = document.getElementById("curlVerbose").checked;
+        const followLocation = document.getElementById("curlFollowLocation").checked;
+        const flags = [];
+        if (method !== "GET") flags.push("-X", method);
+        if (header) flags.push("-H", `"${header}"`);
+        if (verbose) flags.push("-v");
+        if (followLocation) flags.push("-L");
+        return { tool, target, flags };
+      }
+
+      if (tool === "hydra") {
+        const target = document.getElementById("hydraTarget").value.trim() || "127.0.0.1";
+        const service = document.getElementById("hydraService").value;
+        const user = document.getElementById("hydraUser").value.trim() || "admin";
+        const isUserList = document.getElementById("hydraUserList").checked;
+        const wordlist = document.getElementById("hydraWordlist").value;
+        const flags = [];
+        if (isUserList) flags.push("-L", user);
+        else flags.push("-l", user);
+        flags.push("-P", wordlist, target, service);
+        return { tool, target, flags };
+      }
+
+      if (tool === "aircrack-ng") {
+        const target = document.getElementById("aircrackTarget").value.trim() || "/usr/share/wordlists/wpa.cap";
+        const wordlist = document.getElementById("aircrackWordlist").value;
+        const bssid = document.getElementById("aircrackBssid").value.trim();
+        const flags = ["-w", wordlist];
+        if (bssid) flags.push("-b", bssid);
+        flags.push(target);
+        return { tool, target, flags };
+      }
+
+      if (tool === "iperf3") {
+        const target = document.getElementById("iperf3Target").value.trim() || "iperf3-server";
+        const protocol = document.getElementById("iperf3Protocol").value;
+        const time = document.getElementById("iperf3Time").value;
+        const bandwidth = document.getElementById("iperf3Bandwidth").value.trim();
+        const flags = ["-c", target];
+        if (protocol === "udp") flags.push("-u");
+        if (time) flags.push("-t", time);
+        if (bandwidth) flags.push("-b", bandwidth);
+        return { tool, target, flags };
+      }
+
+      const module = document.getElementById("msfModule").value;
+      const rhosts = document.getElementById("msfRhosts").value.trim() || "127.0.0.1";
+      const rport = document.getElementById("msfRport").value.trim();
+      let script = `use ${module}; set RHOSTS ${rhosts}; `;
+      if (rport) script += `set RPORT ${rport}; `;
+      script += "run; exit";
+      return { tool, target: rhosts, flags: ["-q", "-x", `"${script}"`] };
+    }
+
+    function updatePreview() {
+      const { tool, target, flags } = buildCommandParts();
+      const preview = document.getElementById("cmdPreview");
+
+      if (tool === "metasploit") {
+        preview.innerHTML =
+          `<span class="cmd-name">msfconsole</span>` +
+          flags.map(flag => `<span class="cmd-flag"> ${escapeHtml(flag)}</span>`).join("");
+        return;
+      }
+
+      preview.innerHTML =
+        `<span class="cmd-name">${escapeHtml(tool)}</span>` +
+        flags.map(flag => {
+          if (flag === target && tool !== "curl" && tool !== "nmap") {
+            return `<span class="cmd-target"> ${escapeHtml(flag)}</span>`;
+          }
+          return `<span class="cmd-flag"> ${escapeHtml(flag)}</span>`;
+        }).join("") +
+        ((tool === "nmap" || tool === "curl") ? `<span class="cmd-target"> ${escapeHtml(target)}</span>` : "");
+    }
+
     async function runCommand() {
       const tool = document.getElementById("toolSelector").value;
-      let target;
-      if (tool === "nmap") {
-          target = document.getElementById("target").value.trim();
-          if (!target) { alert("スキャン対象を入力してください"); return; }
-      } else if (tool === "gobuster") {
-          target = document.getElementById("gbTarget").value.trim();
-          if (!target) { alert("対象URLを入力してください"); return; }
-      } else if (tool === "curl") {
-          target = document.getElementById("curlTarget").value.trim();
-          if (!target) { alert("対象URLを入力してください"); return; }
-      } else if (tool === "hydra") {
-          target = document.getElementById("hydraTarget").value.trim();
-          if (!target) { alert("ターゲットを入力してください"); return; }
-      } else if (tool === "aircrack-ng") {
-          target = document.getElementById("aircrackTarget").value.trim();
-          if (!target) { alert("ターゲットファイルを入力してください"); return; }
-      } else if (tool === "iperf3") {
-          target = document.getElementById("iperf3Target").value.trim();
-          if (!target) { alert("ターゲットを入力してください"); return; }
-      } else if (tool === "metasploit") {
-          target = document.getElementById("msfRhosts").value.trim();
-          if (!target) { alert("ターゲットを入力してください"); return; }
+      let target = "";
+
+      if (tool === "nmap") target = document.getElementById("target").value.trim();
+      else if (tool === "gobuster") target = document.getElementById("gbTarget").value.trim();
+      else if (tool === "curl") target = document.getElementById("curlTarget").value.trim();
+      else if (tool === "hydra") target = document.getElementById("hydraTarget").value.trim();
+      else if (tool === "aircrack-ng") target = document.getElementById("aircrackTarget").value.trim();
+      else if (tool === "iperf3") target = document.getElementById("iperf3Target").value.trim();
+      else if (tool === "metasploit") target = document.getElementById("msfRhosts").value.trim();
+
+      if (!target) {
+        alert("必須項目を入力してください。");
+        return;
       }
 
       const { flags } = buildCommandParts();
-      let cmdStr;
+      let cmdStr = "";
       if (tool === "nmap") cmdStr = `nmap ${flags.join(" ")} ${target}`;
       else if (tool === "gobuster") cmdStr = `gobuster ${flags.join(" ")}`;
       else if (tool === "curl") cmdStr = `curl ${flags.join(" ")} ${target}`;
@@ -1004,118 +1646,107 @@
       else if (tool === "metasploit") cmdStr = `msfconsole ${flags.join(" ")}`;
 
       setFormDisabled(true);
-
       clearTerminal();
-      appendTerminal(`<span class="term-prompt">student@sandbox:~$</span> <span class="term-cmd">${cmdStr}</span>`);
+      appendTerminal(`<span class="term-prompt">student@sandbox:~$</span> <span class="term-cmd">${escapeHtml(cmdStr)}</span>`);
 
-      // バックエンドが未接続の場合はダミー動作
-      const statusEl = document.getElementById("backendStatus");
-      if (statusEl.textContent.includes("未接続")) {
+      if (!isBackendConnected) {
         appendTerminal(`<div class="term-info">[デモモード] バックエンド未接続のため、コマンド文字列のみ表示します。</div>`);
         appendTerminal(`<div class="loading-dots"><span>.</span><span>.</span><span>.</span></div>`);
-        await new Promise(r => setTimeout(r, 1200));
-        document.getElementById("terminalBody").lastChild.remove();
-        appendTerminal(`<div class="term-success">✓ 生成コマンド: ${cmdStr}</div>`);
+        saveUiState();
+        await new Promise(resolve => setTimeout(resolve, 1200));
+        document.getElementById("terminalBody").lastChild?.remove();
+        appendTerminal(`<div class="term-success">✓ 生成コマンド: ${escapeHtml(cmdStr)}</div>`);
         showAiExplanation(cmdStr, flags, tool);
+        saveUiState();
         setFormDisabled(false);
         return;
       }
 
-      // ローディング表示
       appendTerminal(`<div class="loading-dots" id="loading"><span>.</span><span>.</span><span>.</span></div>`);
+      saveUiState();
 
       try {
         let payload;
         if (tool === "nmap") {
-            payload = {
-              tool: "nmap",
-              options: {
-                target,
-                scan_type: document.getElementById("scanType").value,
-                os_detection: document.getElementById("osDetect").checked,
-                timing: document.getElementById("timing").value,
-                port_range: document.getElementById("portRange").value.trim() || null,
-              }
-            };
+          payload = {
+            tool: "nmap",
+            options: {
+              target,
+              scan_type: document.getElementById("scanType").value,
+              os_detection: document.getElementById("osDetect").checked,
+              timing: document.getElementById("timing").value,
+              port_range: document.getElementById("portRange").value.trim() || null,
+            },
+          };
         } else if (tool === "gobuster") {
-            payload = {
-              tool: "gobuster",
-              options: {
-                target,
-                mode: document.getElementById("gbMode").value,
-                wordlist: document.getElementById("gbWordlist").value,
-                quiet: document.getElementById("gbQuiet").checked,
-              }
-            };
+          payload = {
+            tool: "gobuster",
+            options: {
+              target,
+              mode: document.getElementById("gbMode").value,
+              wordlist: document.getElementById("gbWordlist").value,
+              quiet: document.getElementById("gbQuiet").checked,
+            },
+          };
         } else if (tool === "curl") {
-            payload = {
-              tool: "curl",
-              options: {
-                target,                                                                 // ターゲット URL
-                method: document.getElementById("curlMethod").value,                  // HTTP メソッド
-                header: document.getElementById("curlHeader").value.trim() || null,   // 追加ヘッダー（未入力は null）
-                verbose: document.getElementById("curlVerbose").checked,              // -v フラグの有無
-                // ▼▼▼変更箇所▼▼▼ -L フラグの状態を API ペイロードに含める
-                // バックエンドの CurlOptions.follow_location フィールドに対応する。
-                // True のとき build_curl_command() が "-L" をコマンドリストに追加する。
-                follow_location: document.getElementById("curlFollowLocation").checked, // -L フラグの有無
-                // ▲▲▲変更箇所ここまで▲▲▲
-              }
-            };
+          payload = {
+            tool: "curl",
+            options: {
+              target,
+              method: document.getElementById("curlMethod").value,
+              header: document.getElementById("curlHeader").value.trim() || null,
+              verbose: document.getElementById("curlVerbose").checked,
+              follow_location: document.getElementById("curlFollowLocation").checked,
+            },
+          };
         } else if (tool === "hydra") {
-            payload = {
-              tool: "hydra",
-              options: {
-                target,
-                service: document.getElementById("hydraService").value,
-                user: document.getElementById("hydraUser").value.trim(),
-                user_list: document.getElementById("hydraUserList").checked,
-                wordlist: document.getElementById("hydraWordlist").value,
-              }
-            };
+          payload = {
+            tool: "hydra",
+            options: {
+              target,
+              service: document.getElementById("hydraService").value,
+              user: document.getElementById("hydraUser").value.trim(),
+              user_list: document.getElementById("hydraUserList").checked,
+              wordlist: document.getElementById("hydraWordlist").value,
+            },
+          };
         } else if (tool === "aircrack-ng") {
-            payload = {
-              tool: "aircrack-ng",
-              options: {
-                target_file: target,
-                wordlist: document.getElementById("aircrackWordlist").value,
-                bssid: document.getElementById("aircrackBssid").value.trim() || null,
-              }
-            };
+          payload = {
+            tool: "aircrack-ng",
+            options: {
+              target_file: target,
+              wordlist: document.getElementById("aircrackWordlist").value,
+              bssid: document.getElementById("aircrackBssid").value.trim() || null,
+            },
+          };
         } else if (tool === "iperf3") {
-            payload = {
-              tool: "iperf3",
-              options: {
-                target,
-                protocol: document.getElementById("iperf3Protocol").value,
-                time: parseInt(document.getElementById("iperf3Time").value) || 10,
-                bandwidth: document.getElementById("iperf3Bandwidth").value.trim() || null,
-              }
-            };
-        } else if (tool === "metasploit") {
-            payload = {
-              tool: "metasploit",
-              options: {
-                module: document.getElementById("msfModule").value,
-                rhosts: target,
-                rport: document.getElementById("msfRport").value.trim() || null,
-              }
-            };
+          payload = {
+            tool: "iperf3",
+            options: {
+              target,
+              protocol: document.getElementById("iperf3Protocol").value,
+              time: parseInt(document.getElementById("iperf3Time").value, 10) || 10,
+              bandwidth: document.getElementById("iperf3Bandwidth").value.trim() || null,
+            },
+          };
+        } else {
+          payload = {
+            tool: "metasploit",
+            options: {
+              module: document.getElementById("msfModule").value,
+              rhosts: target,
+              rport: document.getElementById("msfRport").value.trim() || null,
+            },
+          };
         }
 
         payload.current_step = document.getElementById("currentStep").value;
-
-        // ▼▼▼変更箇所▼▼▼ ── セッション ID の引き継ぎ ──────────────────────────────
-        // localStorage から保存済みの session_id を取得し、payload にセットする。
-        // localStorage.getItem() は値がなければ null を返すため、
-        // 初回リクエスト時は null → バックエンドが新規 UUID を自動生成する。
-        payload.session_id = localStorage.getItem("cui_session_id"); // 保存済みIDを取得（なければ null）
-        // ▲▲▲変更箇所ここまで▲▲▲
+        payload.session_id = localStorage.getItem(SESSION_ID_KEY);
 
         const res = await fetch(`${API_BASE}/api/execute`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),    // session_id を含む payload を送信
+          body: JSON.stringify(payload),
           signal: AbortSignal.timeout(120000),
         });
 
@@ -1123,134 +1754,160 @@
 
         if (!res.ok) {
           const err = await res.json();
-          appendTerminal(`<div class="term-error">エラー: ${err.detail || res.statusText}</div>`);
+          appendTerminal(`<div class="term-error">エラー: ${escapeHtml(err.detail || res.statusText)}</div>`);
+          saveUiState();
         } else {
           const data = await res.json();
-
-          // ▼▼▼変更箇所▼▼▼ ── session_id の保存 ──────────────────────────────────
-          // レスポンスに含まれる session_id を localStorage に保存する。
-          // 次回のリクエスト時に payload.session_id として送ることで、
-          // バックエンドが同じセッションのログとして記録できる。
-          if (data.session_id) {                                           // session_id がレスポンスに含まれていれば
-            localStorage.setItem("cui_session_id", data.session_id);      // localStorage に保存（上書き可）
-            console.log("[session] localStorage に session_id を保存:", data.session_id); // デバッグ用ログ
+          if (data.session_id) {
+            localStorage.setItem(SESSION_ID_KEY, data.session_id);
+            formatSessionStatus();
           }
-          // ▲▲▲変更箇所ここまで▲▲▲
 
-          // ▼▼▼変更箇所▼▼▼ ターミナル出力にハイライトを適用する
-          // バックエンドから ai_highlights (文字列の配列) が返ってきた場合、
-          // stdout / stderr 中の該当キーワードを <span> で囲んで HTML として描画する。
-          const highlights = data.ai_highlights || [];  // ハイライトリスト（無ければ空配列）
-          // stdout: applyHighlights でサニタイズ + ハイライトを適用して描画
+          const highlights = data.ai_highlights || [];
           if (data.stdout) appendTerminal(`<div class="term-output">${applyHighlights(data.stdout, highlights)}</div>`);
-          // stderr: 同様にハイライトを適用
           if (data.stderr) appendTerminal(`<div class="term-error">${applyHighlights(data.stderr, highlights)}</div>`);
-          // ▲▲▲変更箇所ここまで▲▲▲
+
           if (data.exit_code === 0) {
             appendTerminal(`<div class="term-success">✓ 終了コード: 0 (成功)</div>`);
           } else {
-            appendTerminal(`<div class="term-error">✗ 終了コード: ${data.exit_code}</div>`);
+            appendTerminal(`<div class="term-error">✗ 終了コード: ${escapeHtml(data.exit_code)}</div>`);
           }
+
           if (data.ai_explanation) {
             document.getElementById("aiBody").innerHTML = `<p>${escapeHtml(data.ai_explanation).replace(/\n/g, "<br>")}</p>`;
           } else {
             showAiExplanation(data.command, flags, tool);
           }
+
+          saveUiState();
         }
-      } catch (e) {
+      } catch (error) {
         document.getElementById("loading")?.remove();
-        appendTerminal(`<div class="term-error">通信エラー: ${e.message}</div>`);
+        appendTerminal(`<div class="term-error">通信エラー: ${escapeHtml(error.message)}</div>`);
+        saveUiState();
       }
 
       setFormDisabled(false);
     }
 
-    function escapeHtml(s) {
-      // 任意の文字列を HTML 安全な形式にエスケープする
-      return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
-    }
-
-    // ▼▼▼変更箇所▼▼▼ ターミナル出力にハイライトを適用するヘルパー関数
-    /**
-     * テキストをサニタイズした後、キーワードを <span class="terminal-highlight"> で囲む。
-     *
-     * 注意: 必ず escapeHtml でサニタイズした後にキーワードを置換することで、
-     * HTML インジェクションを防ぐ。
-     * キーワード中に <, >, & が含まれる場合にもエスケープ後の形式でマッチする。
-     *
-     * @param {string}   text       - ターミナルに表示するテキスト（サニタイズ前）
-     * @param {string[]} highlights - ハイライトするキーワードの配列
-     * @returns {string} サニタイズ済みかつハイライト適用済みの HTML 文字列
-     */
-    function applyHighlights(text, highlights) {
-      // STEP1: まずテキスト全体をサニタイズする（XSS対策の基本）
-      let escaped = escapeHtml(text);        // <, >, & をエンティティ化
-
-      // STEP2: highlights リストが空、または配列でなければハイライト無しで返す
-      if (!Array.isArray(highlights) || highlights.length === 0) {
-        return escaped;                      // ハイライトなしの場合はサニタイズ済みテキストをそのまま返す
-      }
-
-      // STEP3: 各キーワードを順に置換してハイライトする
-      highlights.forEach(keyword => {
-        if (!keyword || typeof keyword !== "string") return; // 空文字や非文字列はスキップ
-
-        // キーワード中の正規表現特殊文字をエスケープする（シリアル化対策）
-        // 例: "2.3.4" の "." が正規表現ワイルドカードにならないようにエスケープする
-        const escapedKeyword = escapeHtml(keyword).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-
-        // エスケープ済みテキスト中のキーワードを <span> で囲む（大文字・小文字を区別しない）
-        const regex = new RegExp(escapedKeyword, "gi"); // gi: 大文字小文字無視＋全構マッチ
-        escaped = escaped.replace(
-          regex,
-          match => `<span class="terminal-highlight">${match}</span>` // マッチした文字列をスパンで囲む
-        );
-      });
-
-      return escaped;  // ハイライト適用済みの HTML 文字列を返す
-    }
-    // ▲▲▲変更箇所ここまで▲▲▲
-
-    // ─── AI解説（ダミー実装） ───
-    function showAiExplanation(cmdStr, flags, tool="nmap") {
+    function showAiExplanation(cmdStr, flags, tool = "nmap") {
       const explanations = {
         "-sV": "<code>-sV</code>（バージョン検出）: 開いているポートで動作しているサービスとそのバージョンを検出します。",
-        "-sS": "<code>-sS</code>（SYNスキャン）: TCP SYNパケットだけを送る「ステルス」スキャン。完全な接続を確立せず、ログに残りにくい。",
-        "-sT": "<code>-sT</code>（TCPコネクト）: 完全なTCPハンドシェイクを行うスキャン。rootなしで実行可能。",
-        "-sU": "<code>-sU</code>（UDPスキャン）: UDPポートをスキャン。TCPより遅いが、DNS/SNMPなどの発見に重要。",
-        "-sn": "<code>-sn</code>（Pingスキャン）: ポートスキャンを行わずホストの生存確認のみ。ネットワーク内の生きているホストを素早く列挙する際に使用。",
-        "-A":  "<code>-A</code>（総合スキャン）: OSの検出・バージョン検出・スクリプトスキャン・tracerouteを一度に実行。情報量が多いが時間がかかる。",
-        "-O":  "<code>-O</code>（OS検出）: TCP/IPスタックのフィンガープリンティングによりOSの種類を推定する。",
-        "-T1": "<code>-T1</code>（非常に遅い）: IDS/IDPSによる検出を回避するため、パケット送信間隔を最大化。",
-        "-T3": "<code>-T3</code>（標準）: nmapのデフォルト速度。速度と信頼性のバランスが取れている。",
-        "-T4": "<code>-T4</code>（高速）: 高速ネットワーク向け。速いが、不安定なネットワークではパケットロスが起きやすい。",
-        "dir": "<code>dir</code>: ディレクトリ・ファイル探索モード。Webサーバー上の隠されたパスを探します。",
-        "dns": "<code>dns</code>: サブドメイン探索モード。対象ドメインに関連するサブドメインを探します。",
-        "vhost": "<code>vhost</code>: バーチャルホスト探索モード。同じIP上の異なるホスト名を探します。",
+        "-sS": "<code>-sS</code>（SYNスキャン）: TCP SYNパケットだけを送るステルス寄りのスキャンです。",
+        "-sT": "<code>-sT</code>（TCPコネクト）: 完全なTCPハンドシェイクを行うスキャンです。",
+        "-sU": "<code>-sU</code>（UDPスキャン）: UDPサービスの探索に使います。",
+        "-sn": "<code>-sn</code>（Pingスキャン）: ホストの生存確認のみを行います。",
+        "-A": "<code>-A</code>（総合スキャン）: OS検出やスクリプト実行まで含めて広く情報を集めます。",
+        "-O": "<code>-O</code>（OS検出）: TCP/IPフィンガープリントからOS種別を推定します。",
+        "-T1": "<code>-T1</code>（非常に遅い）: 検出回避を意識した低速設定です。",
+        "-T3": "<code>-T3</code>（標準）: 速度と安定性のバランスがよい設定です。",
+        "-T4": "<code>-T4</code>（高速）: 高速なネットワーク向けの設定です。",
+        "dir": "<code>dir</code>: Webサーバー上の隠れたパスを探します。",
+        "dns": "<code>dns</code>: サブドメイン探索モードです。",
+        "vhost": "<code>vhost</code>: バーチャルホスト名の探索に使います。",
         "-u": "<code>-u</code>: ターゲットのURLを指定します。",
-        "-w": "<code>-w</code>: 探索に使用する辞書ファイル（ワードリスト）を指定します。",
-        "-q": "<code>-q</code>: Quietモード。バナーやエラーなどを非表示にし、見つかった結果のみを出力します。",
-        "-X": "<code>-X</code>: 使用するHTTPリクエストメソッド（GET, POSTなど）を指定します。",
-        "-H": "<code>-H</code>: HTTPリクエストヘッダーを追加します。",
-        "-v": "<code>-v</code>: Verbose（詳細）モード。リクエストとレスポンスのヘッダーなど詳細な通信内容を表示します。",
+        "-w": "<code>-w</code>: 辞書ファイルを指定します。",
+        "-q": "<code>-q</code>: 出力を簡潔にします。",
+        "-X": "<code>-X</code>: HTTPメソッドを指定します。",
+        "-H": "<code>-H</code>: HTTPヘッダーを追加します。",
+        "-v": "<code>-v</code>: 詳細な通信内容を表示します。",
         "-l": "<code>-l</code>: 単一のユーザー名を指定します。",
-        "-L": "<code>-L</code>: ユーザー名のリスト（辞書）を指定します。",
-        "-P": "<code>-P</code>: パスワード辞書ファイルを指定します。",
-        "-w": "<code>-w</code>: パスワード辞書ファイルを指定します。",
-        "-b": "<code>-b</code>: 対象のBSSID（MACアドレス）を指定します。",
+        "-L": "<code>-L</code>: ユーザー名リストを指定します。",
+        "-P": "<code>-P</code>: パスワード辞書を指定します。",
+        "-b": "<code>-b</code>: 対象BSSIDを指定します。",
       };
 
       let html = `<p>🔍 <strong>コマンド解析:</strong> <code>${escapeHtml(cmdStr)}</code></p>`;
-      flags.forEach(f => {
-        const key = f.split(" ")[0];
-        if (explanations[key]) html += `<p>• ${explanations[key]}</p>`;
+      flags.forEach(flag => {
+        const key = flag.split(" ")[0];
+        if (explanations[key]) {
+          html += `<p>• ${explanations[key]}</p>`;
+        }
       });
-      html += `<p style="color:var(--muted);font-size:0.75rem;margin-top:0.5rem;">※ AI解説機能（OpenAI API連携）は次フェーズで実装予定</p>`;
+      html += `<p style="color:var(--muted);font-size:0.75rem;margin-top:0.5rem;">※ ${escapeHtml(tool)} の解説を表示しています。</p>`;
       document.getElementById("aiBody").innerHTML = html;
     }
 
-    // 初期プレビュー
-    updatePreview();
+    async function initApp() {
+      defaultTerminalMarkup = document.getElementById("terminalBody").innerHTML;
+      defaultAiMarkup = document.getElementById("aiBody").innerHTML;
+
+      attachStateListeners();
+      restoreUiState();
+      await checkBackend();
+      await hydrateSessionStepFromServer();
+      await loadMaterials();
+      updatePreview();
+    }
+
+    // ─── 3ペイン ドラッグリサイズ ───
+    (function initResizablePanes() {
+      const workspace   = document.getElementById('workspace');
+      const leftPanel   = document.getElementById('leftPanel');
+      const divider1    = document.getElementById('divider1');
+      const centerPanel = document.getElementById('centerPanel');
+      const divider2    = document.getElementById('divider2');
+      const rightPanel  = document.getElementById('rightPanel');
+
+      function startDrag(e, activeDivider) {
+        e.preventDefault();
+        activeDivider.classList.add('dragging');
+        document.body.style.cursor = 'col-resize';
+        document.body.style.userSelect = 'none';
+
+        const startX = e.clientX;
+        const wsRect  = workspace.getBoundingClientRect();
+        const leftW   = leftPanel.getBoundingClientRect().width;
+        const rightW  = rightPanel.getBoundingClientRect().width;
+
+        function onMove(ev) {
+          const dx = ev.clientX - startX;
+          const totalW = wsRect.width;
+
+          if (activeDivider === divider1) {
+            const newLeft = Math.min(Math.max(leftW + dx, 200), totalW - 480 - 10 - 220);
+            leftPanel.style.width = newLeft + 'px';
+          } else {
+            const newRight = Math.min(Math.max(rightW - dx, 220), totalW - 200 - 10 - 280);
+            rightPanel.style.width = newRight + 'px';
+          }
+        }
+
+        function onUp() {
+          activeDivider.classList.remove('dragging');
+          document.body.style.cursor = '';
+          document.body.style.userSelect = '';
+          window.removeEventListener('mousemove', onMove);
+          window.removeEventListener('mouseup', onUp);
+        }
+
+        window.addEventListener('mousemove', onMove);
+        window.addEventListener('mouseup', onUp);
+      }
+
+      divider1.addEventListener('mousedown', (e) => startDrag(e, divider1));
+      divider2.addEventListener('mousedown', (e) => startDrag(e, divider2));
+
+      // ペイン幅変更時にPDFズームを再計算
+      new ResizeObserver(() => {
+        const scrollBox = document.getElementById('pdfScrollWrapper');
+        if (scrollBox && !scrollBox.classList.contains('hidden')) {
+          setPdfZoom(currentPdfZoom);
+        }
+      }).observe(document.getElementById('rightPanel'));
+    })();
+
+    // マウスホイールでPDFズーム
+    document.getElementById('pdfScrollWrapper').addEventListener('wheel', (e) => {
+      if (e.ctrlKey || e.metaKey || true) { // ホイールで常にズーム
+        e.preventDefault();
+        const delta = e.deltaY < 0 ? 0.1 : -0.1;
+        adjustPdfZoom(delta);
+      }
+    }, { passive: false });
+
+    initApp();
+
   </script>
 </body>
 </html>

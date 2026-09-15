@@ -3,6 +3,7 @@ models.py
 CUI Learning WebUI — Pydantic リクエスト / レスポンスモデル定義
 """
 
+from datetime import datetime
 from typing import Optional
 from pydantic import BaseModel
 
@@ -85,3 +86,25 @@ class ExecuteResponse(BaseModel):
     ai_explanation: Optional[str] = None   # AI チューターの解説テキスト
     session_id: Optional[str] = None       # 確定したセッション ID（新規生成 or 既存継続）
     ai_highlights: list[str] = []          # ターミナルハイライト用キーワードリスト
+
+
+class SessionStateResponse(BaseModel):
+    session_id: str
+    current_step: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class MaterialFileInfo(BaseModel):
+    filename: str
+    url: str
+    size: int
+    uploaded_at: datetime
+
+
+class MaterialListResponse(BaseModel):
+    materials: list[MaterialFileInfo]
+
+
+class MaterialUploadResponse(BaseModel):
+    material: MaterialFileInfo

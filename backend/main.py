@@ -13,11 +13,13 @@ import os
 import re
 import time
 import uuid
+from pathlib import Path
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
+from urllib.parse import quote
 from urllib.parse import urlparse
 
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
@@ -26,7 +28,8 @@ from executor import run_command_in_sandbox
 from models import (
     NmapOptions, GobusterOptions, CurlOptions, HydraOptions,
     AircrackOptions, Iperf3Options, MetasploitOptions,
-    ExecuteRequest, ExecuteResponse,
+    ExecuteRequest, ExecuteResponse, SessionStateResponse,
+    MaterialFileInfo, MaterialListResponse, MaterialUploadResponse,
 )
 from commands import (
     ALLOWED_TOOLS, build_nmap_command, build_gobuster_command,
@@ -46,6 +49,14 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
 logger = logging.getLogger(__name__)
+
+APP_DIR = Path(__file__).resolve().parent
+PERSISTENT_DATA_DIR = Path("/app/data")
+if not PERSISTENT_DATA_DIR.exists():
+    PERSISTENT_DATA_DIR = APP_DIR
+
+MATERIALS_DIR = PERSISTENT_DATA_DIR / "materials"
+MATERIALS_DIR.mkdir(parents=True, exist_ok=True)
 
 
 # ──────────────────────────────────────────────
@@ -215,6 +226,100 @@ async def health_check():
     return {"status": "ok", "message": "CUI Learning WebUI is running"}
 
 
+@app.get("/api/sessions/{session_id}", response_model=SessionStateResponse)
+async def get_session_state(
+    session_id: str,
+    db: Session = Depends(get_db),
+):
+    db_session = (
+        db.query(DBSession)
+        .filter(DBSession.session_id == session_id)
+        .first()
+    )
+
+    if db_session is None:
+        raise HTTPException(status_code=404, detail="セッションが見つかりません。")
+
+    return SessionStateResponse(
+        session_id=db_session.session_id,
+        current_step=db_session.current_step,
+        created_at=db_session.created_at,
+        updated_at=db_session.updated_at,
+    )
+
+
+def _build_material_info(file_path: Path) -> MaterialFileInfo:
+    stat = file_path.stat()
+    quoted_name = quote(file_path.name)
+    return MaterialFileInfo(
+        filename=file_path.name,
+        url=f"/materials/{quoted_name}",
+        size=stat.st_size,
+        uploaded_at=datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc),
+    )
+
+
+@app.get("/api/materials", response_model=MaterialListResponse)
+async def list_materials():
+    pdf_files = sorted(
+        MATERIALS_DIR.glob("*.pdf"),
+        key=lambda path: path.stat().st_mtime,
+        reverse=True,
+    )
+    return MaterialListResponse(
+        materials=[_build_material_info(path) for path in pdf_files]
+    )
+
+
+@app.post("/api/materials/upload", response_model=MaterialUploadResponse)
+async def upload_material(file: UploadFile = File(...)):
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="アップロードするPDFを選択してください。")
+
+    original_name = Path(file.filename).name
+    if Path(original_name).suffix.lower() != ".pdf":
+        raise HTTPException(status_code=400, detail="PDFファイルのみアップロードできます。")
+
+    # 日本語ファイル名は基本的に保持する（講義資料の識別性を優先）。
+    # パストラバーサルや制御文字だけ除去して保存する。
+    safe_name = original_name.replace("/", "_").replace("\\", "_")
+    safe_name = safe_name.replace("\x00", "_").strip()
+    if not safe_name:
+        safe_name = "material.pdf"
+
+    destination = MATERIALS_DIR / safe_name
+    stem = destination.stem
+    suffix = destination.suffix
+    counter = 1
+    while destination.exists():
+        destination = MATERIALS_DIR / f"{stem}_{counter}{suffix}"
+        counter += 1
+
+    max_size_bytes = 25 * 1024 * 1024
+    total_size = 0
+
+    try:
+        with destination.open("wb") as buffer:
+            while True:
+                chunk = await file.read(1024 * 1024)
+                if not chunk:
+                    break
+                total_size += len(chunk)
+                if total_size > max_size_bytes:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="PDFのサイズは25MB以下にしてください。",
+                    )
+                buffer.write(chunk)
+    except HTTPException:
+        destination.unlink(missing_ok=True)
+        raise
+    finally:
+        await file.close()
+
+    return MaterialUploadResponse(material=_build_material_info(destination))
+
+
 @app.post("/api/execute", response_model=ExecuteResponse)
 async def execute_command(
     req: ExecuteRequest,
@@ -367,6 +472,8 @@ async def execute_command(
 # ──────────────────────────────────────────────
 # フロントエンドの静的ファイル配信
 # ──────────────────────────────────────────────
+app.mount("/materials", StaticFiles(directory=MATERIALS_DIR), name="materials")
+
 frontend_path = os.path.join(os.path.dirname(__file__), "..", "frontend")
 if os.path.exists(frontend_path):
     app.mount("/", StaticFiles(directory=frontend_path, html=True), name="frontend")
