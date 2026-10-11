@@ -9,9 +9,10 @@ Docker サンドボックスへ渡すコマンド引数リストを返す。
 from models import (
     NmapOptions, GobusterOptions, CurlOptions,
     HydraOptions, AircrackOptions, Iperf3Options, MetasploitOptions,
+    WhoisOptions, DigOptions,
 )
 
-ALLOWED_TOOLS = {"nmap", "gobuster", "curl", "hydra", "aircrack-ng", "iperf3", "metasploit"}
+ALLOWED_TOOLS = {"nmap", "gobuster", "curl", "hydra", "aircrack-ng", "iperf3", "metasploit", "whois", "dig"}
 
 
 def build_nmap_command(opts: NmapOptions) -> list[str]:
@@ -80,3 +81,16 @@ def build_metasploit_command(opts: MetasploitOptions) -> list[str]:
         script += f"set RPORT {opts.rport}; "
     script += "run; exit"
     return ["-q", "-x", script]
+
+
+def build_whois_command(opts: WhoisOptions) -> list[str]:
+    # whois <target>（追加オプションなし）
+    return ["whois", opts.target]
+
+
+def build_dig_command(opts: DigOptions) -> list[str]:
+    # dig <target> <record_type> [+short]（クエリ → 型 → +オプションの順）
+    cmd = ["dig", opts.target, opts.record_type]
+    if opts.short:
+        cmd.append("+short")
+    return cmd

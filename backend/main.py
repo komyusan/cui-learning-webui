@@ -4,7 +4,10 @@ CUI Learning WebUI — FastAPI バックエンド
 
 エンドポイント:
   POST /api/execute  : オプションを受け取り、コマンドを生成・実行して結果を返す
-  GET  /api/health   : ヘルスチェック
+  GET  /api/health   : ヘルスチェック（認証不要）
+  POST /api/login    : LDAP 認証してセッションクッキーを発行
+  POST /api/logout   : セッションクッキーを削除
+  GET  /api/me       : ログイン中ユーザの確認
 """
 
 import logging
@@ -19,7 +22,8 @@ from datetime import datetime, timezone
 from urllib.parse import quote
 from urllib.parse import urlparse
 
-from fastapi import FastAPI, HTTPException, Depends, File, UploadFile
+from fastapi import FastAPI, HTTPException, Depends, File, UploadFile, Response
+from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
@@ -28,6 +32,7 @@ from executor import run_command_in_sandbox
 from models import (
     NmapOptions, GobusterOptions, CurlOptions, HydraOptions,
     AircrackOptions, Iperf3Options, MetasploitOptions,
+    WhoisOptions, DigOptions,
     ExecuteRequest, ExecuteResponse, SessionStateResponse,
     MaterialFileInfo, MaterialListResponse, MaterialUploadResponse,
 )
@@ -35,10 +40,16 @@ from commands import (
     ALLOWED_TOOLS, build_nmap_command, build_gobuster_command,
     build_curl_command, build_hydra_command, build_aircrack_command,
     build_iperf_command, build_metasploit_command,
+    build_whois_command, build_dig_command,
 )
 from ai_service import build_llm_context, generate_ai_response
 from database import get_db, init_db
-from db_models import Session as DBSession, CommandLog
+from db_models import Session as DBSession, CommandLog, User
+from auth import (
+    authenticate_ldap, create_session_cookie, get_current_user,
+    is_skip_auth, DEV_USER_UID,
+    SESSION_COOKIE_NAME, SESSION_MAX_AGE,
+)
 
 
 # ──────────────────────────────────────────────
@@ -226,6 +237,72 @@ async def health_check():
     return {"status": "ok", "message": "CUI Learning WebUI is running"}
 
 
+class LoginRequest(BaseModel):
+    uid: str
+    password: str
+
+
+@app.post("/api/login")
+async def login(
+    req: LoginRequest,
+    response: Response,
+    db: Session = Depends(get_db),
+):
+    """LDAP で認証し、成功したら署名付きセッションクッキーをセットする。"""
+    # 開発モード（SKIP_AUTH=true）: 認証せず dev_user で即成功とする
+    if is_skip_auth():
+        logger.warning("[auth] SKIP_AUTH=true: 認証をスキップします")
+        return {"status": "ok", "uid": DEV_USER_UID}
+
+    user_info = authenticate_ldap(req.uid.strip(), req.password)
+    if user_info is None:
+        raise HTTPException(
+            status_code=401,
+            detail="学籍番号またはパスワードが正しくありません。",
+        )
+
+    # ユーザ情報を DB に記録（初回は作成、以降は最終ログイン時刻を更新）
+    now_utc = datetime.now(timezone.utc).replace(tzinfo=None)
+    user = db.query(User).filter(User.ldap_uid == user_info["uid"]).first()
+    if user is None:
+        user = User(
+            ldap_uid=user_info["uid"],
+            cn=user_info["cn"],
+            mail=user_info["mail"],
+            first_login_at=now_utc,
+            last_login_at=now_utc,
+        )
+        db.add(user)
+    else:
+        user.cn = user_info["cn"]
+        user.mail = user_info["mail"]
+        user.last_login_at = now_utc
+    db.commit()
+
+    response.set_cookie(
+        key=SESSION_COOKIE_NAME,
+        value=create_session_cookie(user_info["uid"]),
+        max_age=SESSION_MAX_AGE,
+        httponly=True,
+        samesite="lax",
+        secure=os.environ.get("SESSION_COOKIE_SECURE", "false").lower() == "true",
+    )
+    return {"status": "ok", "uid": user_info["uid"]}
+
+
+@app.post("/api/logout")
+async def logout(response: Response):
+    """セッションクッキーを削除する。"""
+    response.delete_cookie(key=SESSION_COOKIE_NAME)
+    return {"status": "ok"}
+
+
+@app.get("/api/me")
+async def me(uid: str = Depends(get_current_user)):
+    """現在ログイン中のユーザの uid を返す（フロントのログイン状態確認用）。"""
+    return {"uid": uid}
+
+
 @app.get("/api/sessions/{session_id}", response_model=SessionStateResponse)
 async def get_session_state(
     session_id: str,
@@ -324,6 +401,7 @@ async def upload_material(file: UploadFile = File(...)):
 async def execute_command(
     req: ExecuteRequest,
     db: Session = Depends(get_db),
+    uid: str = Depends(get_current_user),
 ):
     """
     フロントエンドからオプションを受け取り、
@@ -337,7 +415,22 @@ async def execute_command(
         )
 
     # ── ターゲット検証 ──
-    if req.tool in ("nmap", "gobuster", "curl", "hydra", "iperf3"):
+    if req.tool in ("whois", "dig"):
+        # 任意のドメイン/IPを許可するため is_safe_target は適用しない。
+        # ただしオプション注入を防ぐため、最低限の形式のみ検証する。
+        raw_target = req.options.get("target")
+        if (
+            not isinstance(raw_target, str)
+            or not raw_target.strip()
+            or raw_target.startswith("-")
+            or re.search(r"\s", raw_target)
+        ):
+            raise HTTPException(
+                status_code=400,
+                detail="ターゲットには空白を含まない、'-' で始まらないドメイン/IPを指定してください。",
+            )
+        target_str = None
+    elif req.tool in ("nmap", "gobuster", "curl", "hydra", "iperf3"):
         target_str = req.options.get("target")
     elif req.tool == "metasploit":
         target_str = req.options.get("rhosts")
@@ -387,6 +480,14 @@ async def execute_command(
         command = build_metasploit_command(MetasploitOptions(**req.options))
         image = "metasploitframework/metasploit-framework:latest"
         network_mode = compose_network
+    elif req.tool == "whois":
+        command = build_whois_command(WhoisOptions(**req.options))
+        image = "cui-learning-sandbox:latest"
+        network_mode = compose_network
+    elif req.tool == "dig":
+        command = build_dig_command(DigOptions(**req.options))
+        image = "cui-learning-sandbox:latest"
+        network_mode = compose_network
 
     # hydra / aircrack-ng はツール名がすでに先頭にある
     command_str = (
@@ -398,7 +499,7 @@ async def execute_command(
     # ── セッション管理 ──
     db_session = _get_or_create_session(
         db=db,
-        session_id=req.session_id,
+        session_id=uid,  # ユーザごとに session_id を固定（ログをユーザに紐付ける）
         current_step=req.current_step,
     )
     active_session_id = db_session.session_id

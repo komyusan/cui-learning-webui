@@ -104,6 +104,25 @@ docker compose start
 docker compose down
 ```
 
+### サンドボックスイメージの再ビルド
+
+`hydra` / `aircrack-ng` / `whois` / `dig` は `cui-learning-sandbox:latest` イメージ内で実行されます。このイメージは `docker compose up --build` では**ビルドされない**ため、`backend/Dockerfile.sandbox` を変更した場合は手動で再ビルドしてください（例: `whois` / `dnsutils` 追加時）。
+
+```bash
+# プロジェクトルートから実行
+cd backend
+docker build -f Dockerfile.sandbox -t cui-learning-sandbox:latest .
+cd ..
+
+# ツールが入っていることの確認
+docker run --rm cui-learning-sandbox:latest dig -v
+docker run --rm cui-learning-sandbox:latest whois --version
+```
+
+バックエンドは実行のたびに使い捨てコンテナを起動するため、再ビルド後にバックエンドを再起動する必要はありません。
+
+> **注意**: 再ビルド前は `exec: dig: not found`（終了コード 127）のようなエラーになります。
+
 API ドキュメント: http://localhost:8000/docs
 
 ## 機能（MVP）

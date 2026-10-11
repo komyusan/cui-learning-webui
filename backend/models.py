@@ -4,7 +4,7 @@ CUI Learning WebUI — Pydantic リクエスト / レスポンスモデル定義
 """
 
 from datetime import datetime
-from typing import Optional
+from typing import Literal, Optional
 from pydantic import BaseModel
 
 
@@ -65,6 +65,16 @@ class MetasploitOptions(BaseModel):
     module: str
     rhosts: str
     rport: Optional[str] = None
+
+
+class WhoisOptions(BaseModel):
+    target: str                             # 照会対象のドメイン / IP
+
+
+class DigOptions(BaseModel):
+    target: str                             # 照会対象のドメイン
+    record_type: Literal["A", "MX", "TXT", "ANY"] = "A"  # レコード指定（許可リスト）
+    short: bool = False                     # +short: 回答のみを短く出力するか
 
 
 # ──────────────────────────────────────────────

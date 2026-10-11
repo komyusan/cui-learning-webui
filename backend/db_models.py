@@ -188,3 +188,30 @@ class CommandLog(Base):
             f"tool={self.tool_name!r} "
             f"exit={self.exit_code}>"
         )
+
+
+# ──────────────────────────────────────────────
+# users テーブル
+# ──────────────────────────────────────────────
+class User(Base):
+    """
+    LDAP 認証でログインしたユーザを記録するテーブル。
+    ldap_uid（学籍番号）は sessions.session_id と同じ値を使う。
+    """
+
+    __tablename__ = "users"
+
+    # PrimaryKey: LDAP の uid（例: e235736）
+    ldap_uid = Column(String(36), primary_key=True, nullable=False)
+
+    # LDAP から取得した表示名・メールアドレス
+    cn = Column(String(255), nullable=True)
+    mail = Column(String(255), nullable=True)
+
+    # 初回ログイン日時 / 最終ログイン日時（UTC naive）
+    first_login_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    last_login_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+    def __repr__(self) -> str:
+        """デバッグ用の文字列表現"""
+        return f"<User uid={self.ldap_uid!r} last_login={self.last_login_at}>"

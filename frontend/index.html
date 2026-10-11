@@ -572,6 +572,8 @@
           <option value="aircrack-ng">aircrack-ng (オフライン辞書攻撃)</option>
           <option value="iperf3">iperf3 (ネットワーク帯域幅測定)</option>
           <option value="metasploit">Metasploit (エクスプロイトフレームワーク)</option>
+          <option value="whois">whois (ドメイン/IP登録情報の照会)</option>
+          <option value="dig">dig (DNS問い合わせ)</option>
         </select>
       </div>
 
@@ -911,6 +913,49 @@
           </div>
         </div>
 
+        <!-- whoisオプションコンテナ（ターゲットのみ） -->
+        <div id="whoisOptionsContainer" class="hidden flex-col gap-5">
+          <div class="text-xs text-green-400 bg-green-900/30 p-3 rounded border border-green-800 mb-2">
+            ℹ️ whoisでドメインやIPアドレスの登録情報を照会します。
+          </div>
+          <div>
+            <label class="opt-label group relative flex items-center gap-1 w-max" for="whoisTarget">
+              🎯 ターゲット (ドメイン / IP)
+            </label>
+            <input type="text" id="whoisTarget" value="example.com" placeholder="例: example.com" />
+          </div>
+        </div>
+
+        <!-- digオプションコンテナ -->
+        <div id="digOptionsContainer" class="hidden flex-col gap-5">
+          <div class="text-xs text-green-400 bg-green-900/30 p-3 rounded border border-green-800 mb-2">
+            ℹ️ digでDNSサーバーにレコードを問い合わせます。
+          </div>
+          <div>
+            <label class="opt-label group relative flex items-center gap-1 w-max" for="digTarget">
+              🎯 ターゲット (ドメイン)
+            </label>
+            <input type="text" id="digTarget" value="example.com" placeholder="例: example.com" />
+          </div>
+          <div>
+            <label class="opt-label group relative flex items-center gap-1 w-max" for="digRecordType">
+              📄 レコード指定
+            </label>
+            <select id="digRecordType">
+              <option value="A">A (IPv4アドレス)</option>
+              <option value="MX">MX (メールサーバー)</option>
+              <option value="TXT">TXT (テキスト情報)</option>
+              <option value="ANY">ANY (全レコード)</option>
+            </select>
+          </div>
+          <div>
+            <label class="flex items-center gap-2 text-sm" for="digShort">
+              <input type="checkbox" id="digShort" />
+              +short (回答のみを短く出力)
+            </label>
+          </div>
+        </div>
+
         <!-- metasploitオプションコンテナ -->
         <div id="metasploitOptionsContainer" class="hidden flex-col gap-5">
           <div class="text-xs text-red-400 bg-red-900/30 p-3 rounded border border-red-800 mb-2">
@@ -1071,6 +1116,8 @@
     const aircrackFields = ["aircrackTarget", "aircrackWordlist", "aircrackBssid"];
     const iperf3Fields = ["iperf3Target", "iperf3Protocol", "iperf3Time", "iperf3Bandwidth"];
     const msfFields = ["msfModule", "msfRhosts", "msfRport"];
+    const whoisFields = ["whoisTarget"];
+    const digFields = ["digTarget", "digRecordType", "digShort"];
     const trackedFieldIds = [
       "toolSelector",
       ...nmapFields,
@@ -1080,6 +1127,8 @@
       ...aircrackFields,
       ...iperf3Fields,
       ...msfFields,
+      ...whoisFields,
+      ...digFields,
     ];
 
     let isBackendConnected = false;
@@ -1494,6 +1543,8 @@
         "aircrack-ng": document.getElementById("aircrackOptionsContainer"),
         "iperf3": document.getElementById("iperf3OptionsContainer"),
         "metasploit": document.getElementById("metasploitOptionsContainer"),
+        "whois": document.getElementById("whoisOptionsContainer"),
+        "dig": document.getElementById("digOptionsContainer"),
       };
 
       Object.entries(containers).forEach(([key, container]) => {
@@ -1586,6 +1637,18 @@
         if (bandwidth) flags.push("-b", bandwidth);
         return { tool, target, flags };
       }
+      if (tool === "whois") {
+        const target = document.getElementById("whoisTarget").value.trim() || "example.com";
+        return { tool, target, flags: [target] };
+      }
+
+      if (tool === "dig") {
+        const target = document.getElementById("digTarget").value.trim() || "example.com";
+        const recordType = document.getElementById("digRecordType").value;
+        const flags = [target, recordType];
+        if (document.getElementById("digShort").checked) flags.push("+short");
+        return { tool, target, flags };
+      }
 
       const module = document.getElementById("msfModule").value;
       const rhosts = document.getElementById("msfRhosts").value.trim() || "127.0.0.1";
@@ -1629,6 +1692,8 @@
       else if (tool === "aircrack-ng") target = document.getElementById("aircrackTarget").value.trim();
       else if (tool === "iperf3") target = document.getElementById("iperf3Target").value.trim();
       else if (tool === "metasploit") target = document.getElementById("msfRhosts").value.trim();
+      else if (tool === "whois") target = document.getElementById("whoisTarget").value.trim();
+      else if (tool === "dig") target = document.getElementById("digTarget").value.trim();
 
       if (!target) {
         alert("必須項目を入力してください。");
@@ -1644,6 +1709,8 @@
       else if (tool === "aircrack-ng") cmdStr = `aircrack-ng ${flags.join(" ")}`;
       else if (tool === "iperf3") cmdStr = `iperf3 ${flags.join(" ")}`;
       else if (tool === "metasploit") cmdStr = `msfconsole ${flags.join(" ")}`;
+      else if (tool === "whois") cmdStr = `whois ${flags.join(" ")}`;
+      else if (tool === "dig") cmdStr = `dig ${flags.join(" ")}`;
 
       setFormDisabled(true);
       clearTerminal();
@@ -1727,6 +1794,20 @@
               protocol: document.getElementById("iperf3Protocol").value,
               time: parseInt(document.getElementById("iperf3Time").value, 10) || 10,
               bandwidth: document.getElementById("iperf3Bandwidth").value.trim() || null,
+            },
+          };
+        } else if (tool === "whois") {
+          payload = {
+            tool: "whois",
+            options: { target },
+          };
+        } else if (tool === "dig") {
+          payload = {
+            tool: "dig",
+            options: {
+              target,
+              record_type: document.getElementById("digRecordType").value,
+              short: document.getElementById("digShort").checked,
             },
           };
         } else {

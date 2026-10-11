@@ -6,6 +6,9 @@ RUN apt-get update && apt-get install -y \
     hydra \
     aircrack-ng \
     openssh-server \
+    whois \
+    dnsutils \
+    netbase \
     && rm -rf /var/lib/apt/lists/*
 
 # SSH デーモンの起動に必要なディレクトリを作成
