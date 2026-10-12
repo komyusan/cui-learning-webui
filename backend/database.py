@@ -12,8 +12,11 @@ CUI Learning WebUI — SQLAlchemy データベース接続設定
 
 import os                               # 環境変数・ファイルパス操作用標準ライブラリ
 import logging                          # ログ出力用標準ライブラリ
+import sqlite3                          # SQLite 接続かどうかの判定用標準ライブラリ
 
 from sqlalchemy import create_engine    # DB への接続エンジンを生成する関数
+from sqlalchemy import event            # 接続時などの SQLAlchemy イベントリスナー登録用
+from sqlalchemy.engine import Engine    # イベントの対象となる Engine クラス
 from sqlalchemy.orm import (            # ORM セッション関連クラスのインポート
     declarative_base,                   #   モデル定義の基底クラスを生成するファクトリ
     sessionmaker,                       #   セッションファクトリを生成するクラス
@@ -58,6 +61,20 @@ engine = create_engine(
     connect_args={"check_same_thread": False},  # SQLite のスレッド制限を解除
     echo=False,                                 # True にするとすべての SQL が標準出力に表示される（デバッグ時に便利）
 )
+
+# ──────────────────────────────────────────────
+# SQLite の WAL モード有効化
+# ──────────────────────────────────────────────
+# DB 接続が確立されるたびに PRAGMA を実行する。
+#   journal_mode=WAL  : 書き込み中でも読み取りをブロックしない（同時アクセス性能が向上）
+#   synchronous=NORMAL: WAL モードでは安全性を保ちつつ fsync 回数を減らし書き込みを高速化
+@event.listens_for(Engine, "connect")
+def set_sqlite_pragma(dbapi_connection, connection_record):
+    if isinstance(dbapi_connection, sqlite3.Connection):    # SQLite 以外（PostgreSQL 等）では実行しない
+        cursor = dbapi_connection.cursor()                  # PRAGMA 実行用のカーソルを取得
+        cursor.execute("PRAGMA journal_mode=WAL")           # WAL モードを有効化
+        cursor.execute("PRAGMA synchronous=NORMAL")         # 同期レベルを NORMAL に設定
+        cursor.close()                                      # カーソルを閉じる
 
 # ──────────────────────────────────────────────
 # セッションファクトリの作成
@@ -116,4 +133,20 @@ def init_db():
     """
     import db_models  # noqa: F401  ← テーブル定義をインポートして Base に登録させる
     Base.metadata.create_all(bind=engine)  # Base に登録されたモデルのテーブルをすべて作成
+
+    # create_all は既存テーブルに列を追加しないため、sessions の不足列を補う簡易マイグレーション
+    from sqlalchemy import inspect, text
+    existing_cols = {c["name"] for c in inspect(engine).get_columns("sessions")}
+    with engine.begin() as conn:
+        if "container_network" not in existing_cols:
+            conn.execute(text("ALTER TABLE sessions ADD COLUMN container_network VARCHAR"))
+        if "containers_started_at" not in existing_cols:
+            conn.execute(text("ALTER TABLE sessions ADD COLUMN containers_started_at DATETIME"))
+
+    # command_logs の condition 列（実験条件）を補う
+    log_cols = {c["name"] for c in inspect(engine).get_columns("command_logs")}
+    with engine.begin() as conn:
+        if "condition" not in log_cols:
+            conn.execute(text("ALTER TABLE command_logs ADD COLUMN condition VARCHAR"))
+
     logger.info("[database] テーブルの初期化が完了しました")

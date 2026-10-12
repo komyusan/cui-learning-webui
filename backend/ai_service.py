@@ -284,7 +284,7 @@ def build_system_prompt(
 
 {context_block}
 
-【🚨 緊急サポートモード — 以下の指示のみに従ってください】
+【緊急サポートモード — 以下の指示のみに従ってください】
 
 学生は今、詰まっています。通常の「ヒントだけ出す」制約はありません。
 次のことを行ってください：
@@ -416,13 +416,13 @@ def generate_ai_response(
 
     except APITimeoutError as e:
         logger.error("[OpenAI] タイムアウト: %s", e)
-        return {"message": "⏱️ AI チューターへの接続がタイムアウトしました。ネットワーク設定を確認してください。", "highlights": []}
+        return {"message": "AI チューターへの接続がタイムアウトしました。ネットワーク設定を確認してください。", "highlights": []}
     except AuthenticationError as e:
         logger.error("[OpenAI] 認証エラー: %s", e)
-        return {"message": "🔑 APIキーが無効です。環境変数 OPENAI_API_KEY を確認してください。", "highlights": []}
+        return {"message": "APIキーが無効です。環境変数 OPENAI_API_KEY を確認してください。", "highlights": []}
     except APIConnectionError as e:
         logger.error("[OpenAI] 接続エラー: %s", e)
-        return {"message": "🌐 AI チューターへの接続に失敗しました。コンテナのネットワーク設定を確認してください。", "highlights": []}
+        return {"message": "AI チューターへの接続に失敗しました。コンテナのネットワーク設定を確認してください。", "highlights": []}
     except Exception as e:
         logger.error("[OpenAI] 予期せぬエラー: %s", e)
-        return {"message": "❌ AI チューターの処理中にエラーが発生しました。", "highlights": []}
+        return {"message": "AI チューターの処理中にエラーが発生しました。", "highlights": []}

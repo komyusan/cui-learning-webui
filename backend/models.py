@@ -86,6 +86,12 @@ class ExecuteRequest(BaseModel):
     current_step: str = "Step 1"
     options: dict
     session_id: Optional[str] = None       # 省略時は None → 新規セッションを自動生成
+    condition: str = "with_ai"             # 実験条件: "with_ai"（GUI+AI解説）/ "without_ai"（ターミナルのみ）
+
+
+class RawExecuteRequest(BaseModel):
+    raw_command: str                        # ターミナル入力の生コマンド（例: "nmap -sV dummy-web"）
+    current_step: str = "Step 1"
 
 
 class ExecuteResponse(BaseModel):

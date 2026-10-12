@@ -526,13 +526,103 @@
       background-color: rgba(255, 235, 59, 0.45); /* ホバー時に少し濃く */
     }
     /* ▲▲▲変更箇所ここまで▲▲▲ */
+    /* ─── ログイン画面 ─── */
+    body.auth-pending > header, body.auth-pending > .workspace,
+    body.auth-login > header, body.auth-login > .workspace { display: none; }
+    body.auth-pending #loginScreen, body.auth-main #loginScreen { display: none; }
+    .login-screen {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+    }
+    .login-card {
+      width: 100%;
+      max-width: 360px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    .login-card h2 { font-size: 1rem; font-weight: 700; color: var(--accent); letter-spacing: 0.03em; }
+    .login-card input[type="password"] {
+      width: 100%;
+      background: #0d1117;
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 6px;
+      padding: 0.5rem 0.75rem;
+      font-size: 0.85rem;
+      font-family: 'JetBrains Mono', monospace;
+      transition: border-color 0.2s;
+    }
+    .login-card input[type="password"]:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px rgba(88,166,255,0.15); }
+    .login-card .run-btn { margin-top: 0; }
+    .login-error { color: var(--terminal-red); font-size: 0.8rem; min-height: 1.1rem; }
+    /* ─── 実験条件（補助あり / 補助なし）─── */
+    .condition-group { border: 1px solid var(--border); border-radius: 6px; padding: 0.5rem 0.75rem; display: flex; flex-direction: column; gap: 0.4rem; }
+    .condition-group legend { font-size: 0.75rem; color: var(--muted); padding: 0 0.25rem; }
+    .condition-option { display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: var(--text); cursor: pointer; }
+    .condition-option input { accent-color: var(--accent); }
+    .condition-toggle {
+      font-size: 0.75rem; color: var(--accent); background: #21262d;
+      border: 1px solid var(--border); border-radius: 9999px; padding: 2px 10px;
+      cursor: pointer; white-space: nowrap; transition: border-color 0.2s, background 0.2s;
+    }
+    .condition-toggle:hover { border-color: var(--accent); background: #30363d; }
+    /* 補助なしモード: GUI パネルと AI 解説を隠し、ターミナル入力を表示する */
+    .raw-input-bar { display: none; align-items: center; gap: 0.5rem; padding: 0.5rem 0.75rem; border-top: 1px solid var(--border); background: var(--terminal-bg); }
+    .raw-input-bar .term-prompt { font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; white-space: nowrap; }
+    .raw-input-bar input {
+      flex: 1; min-width: 0; background: #0d1117; border: 1px solid var(--border); color: var(--text);
+      border-radius: 6px; padding: 0.4rem 0.75rem; font-size: 0.85rem; font-family: 'JetBrains Mono', monospace;
+      transition: border-color 0.2s;
+    }
+    .raw-input-bar input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px rgba(88,166,255,0.15); }
+    .raw-input-bar .run-btn { margin-top: 0; width: auto; padding: 0.4rem 1rem; }
+    body.mode-without-ai .raw-input-bar { display: flex; }
+    body.mode-without-ai #leftPanel,
+    body.mode-without-ai #divider1,
+    body.mode-without-ai .ai-pane { display: none; }
   </style>
 </head>
-<body>
+<body class="auth-pending">
+  <!-- ══ ログイン画面 ══ -->
+  <div class="login-screen" id="loginScreen">
+    <form class="login-card" id="loginForm" onsubmit="submitLogin(event)">
+      <h2>CUI Learning WebUI — ログイン</h2>
+      <div>
+        <label class="opt-label" for="loginUid">学籍番号</label>
+        <input type="text" id="loginUid" autocomplete="username" required />
+      </div>
+      <div>
+        <label class="opt-label" for="loginPassword">パスワード</label>
+        <input type="password" id="loginPassword" autocomplete="current-password" required />
+      </div>
+      <fieldset class="condition-group" id="loginConditionGroup">
+        <legend>学習モードを選択</legend>
+        <label class="condition-option">
+          <input type="radio" name="loginCondition" id="loginConditionWithAi" value="with_ai" checked />
+          補助あり（GUI）
+        </label>
+        <label class="condition-option">
+          <input type="radio" name="loginCondition" id="loginConditionWithoutAi" value="without_ai" />
+          補助なし（ターミナル）
+        </label>
+      </fieldset>
+      <div class="login-error" id="loginError"></div>
+      <button type="submit" class="run-btn" id="loginSubmit">ログイン</button>
+    </form>
+  </div>
+
   <header class="flex flex-col gap-0 bg-[#161b22] border-b border-[#30363d] flex-shrink-0">
     <!-- 最上段: タイトル・状態保持・リセット・バックエンド状態 -->
     <div class="flex items-center gap-3 px-5 py-2 border-b border-[#30363d] flex-wrap">
-      <h1 class="text-base font-bold text-[#58a6ff] tracking-wide whitespace-nowrap">⚡ CUI Learning WebUI</h1>
+      <h1 class="text-base font-bold text-[#58a6ff] tracking-wide whitespace-nowrap">CUI Learning WebUI</h1>
       <span class="text-xs text-[#8b949e] bg-[#21262d] px-2 py-0.5 rounded-full border border-[#30363d] whitespace-nowrap">MVP v0.1</span>
       <div class="session-pill whitespace-nowrap">
         <span>状態保持</span>
@@ -540,6 +630,9 @@
       </div>
       <button class="ghost-btn whitespace-nowrap" type="button" onclick="resetLearningState()">学習状態をリセット</button>
       <span id="backendStatus" class="ml-auto text-sm text-[#8b949e] whitespace-nowrap">● Backend: 確認中…</span>
+      <span id="currentUser" class="text-sm text-[#8b949e] whitespace-nowrap"></span>
+      <button class="condition-toggle" type="button" id="conditionToggle" onclick="toggleCondition()" title="クリックで学習モードを切り替え"></button>
+      <button class="ghost-btn whitespace-nowrap" type="button" id="logoutBtn" onclick="logout()">ログアウト</button>
     </div>
     <!-- PTES Lesson Stepper -->
     <div class="flex items-center justify-between">
@@ -558,7 +651,7 @@
       <!-- ツール切り替え -->
       <div class="px-4 pt-3 pb-1 border-b border-gray-800 flex-shrink-0">
         <label class="opt-label group relative flex items-center gap-1 w-max mb-1" for="toolSelector">
-          🧰 ツール選択
+          ツール選択
           <svg class="w-3 h-3 text-gray-500 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
           <div class="hidden group-hover:block absolute left-0 top-full mt-1 w-48 p-2 bg-gray-800 text-white text-xs rounded z-50 border border-gray-600 shadow-lg font-normal normal-case">
             使用するサイバーセキュリティツールを選択します。
@@ -585,7 +678,7 @@
           <!-- ターゲット -->
           <div>
             <label class="opt-label group relative flex items-center gap-1 w-max" for="target">
-              🎯 スキャン対象 (target)
+              スキャン対象 (target)
               <svg class="w-3 h-3 text-gray-500 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
               <div class="hidden group-hover:block absolute left-0 top-full mt-1 w-48 p-2 bg-gray-800 text-white text-xs rounded z-50 border border-gray-600 shadow-lg font-normal normal-case">
                 スキャン対象のIPアドレス、ネットワーク、またはドメインを入力します。
@@ -597,7 +690,7 @@
           <!-- スキャン種別 -->
           <div>
             <label class="opt-label group relative flex items-center gap-1 w-max" for="scanType">
-              🔍 スキャン種別
+              スキャン種別
               <svg class="w-3 h-3 text-gray-500 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
               <div class="hidden group-hover:block absolute left-0 top-full mt-1 w-48 p-2 bg-gray-800 text-white text-xs rounded z-50 border border-gray-600 shadow-lg font-normal normal-case">
                 ポートの探索方法（TCP接続、SYN、UDPなど）を選択します。
@@ -616,7 +709,7 @@
           <!-- タイミング -->
           <div>
             <label class="opt-label group relative flex items-center gap-1 w-max" for="timing">
-              ⏱ タイミングテンプレート
+              タイミングテンプレート
               <svg class="w-3 h-3 text-gray-500 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
               <div class="hidden group-hover:block absolute left-0 top-full mt-1 w-48 p-2 bg-gray-800 text-white text-xs rounded z-50 border border-gray-600 shadow-lg font-normal normal-case">
                 スキャン速度を調整します。速いほど見つかりやすく（またはパケットロスしやすく）なります。
@@ -634,7 +727,7 @@
           <!-- ポート範囲 -->
           <div>
             <label class="opt-label group relative flex items-center gap-1 w-max" for="portRange">
-              🔌 ポート範囲
+              ポート範囲
               <svg class="w-3 h-3 text-gray-500 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
               <div class="hidden group-hover:block absolute left-0 top-full mt-1 w-48 p-2 bg-gray-800 text-white text-xs rounded z-50 border border-gray-600 shadow-lg font-normal normal-case">
                 スキャンするポートを指定します。空白の場合は主要な1000ポートをスキャンします。
@@ -646,7 +739,7 @@
           <!-- 追加オプション（チェックボックス）-->
           <div>
             <label class="opt-label group relative flex items-center gap-1 w-max">
-              📋 追加オプション
+              追加オプション
               <svg class="w-3 h-3 text-gray-500 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
               <div class="hidden group-hover:block absolute left-0 top-full mt-1 w-48 p-2 bg-gray-800 text-white text-xs rounded z-50 border border-gray-600 shadow-lg font-normal normal-case">
                 その他のフラグを指定します。
@@ -672,7 +765,7 @@
           <!-- ターゲットURL -->
           <div>
             <label class="opt-label group relative flex items-center gap-1 w-max" for="gbTarget">
-              🌐 対象URL (url)
+              対象URL (url)
               <svg class="w-3 h-3 text-gray-500 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
               <div class="hidden group-hover:block absolute left-0 top-full mt-1 w-48 p-2 bg-gray-800 text-white text-xs rounded z-50 border border-gray-600 shadow-lg font-normal normal-case">
                 探索対象のベースURLを指定します。
@@ -684,7 +777,7 @@
           <!-- 探索モード -->
           <div>
             <label class="opt-label group relative flex items-center gap-1 w-max" for="gbMode">
-              🛠 探索モード
+              探索モード
               <svg class="w-3 h-3 text-gray-500 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
               <div class="hidden group-hover:block absolute left-0 top-full mt-1 w-48 p-2 bg-gray-800 text-white text-xs rounded z-50 border border-gray-600 shadow-lg font-normal normal-case">
                 dir (ディレクトリ・ファイル探索), dns (サブドメイン探索) などを選びます。
@@ -700,7 +793,7 @@
           <!-- ワードリスト -->
           <div>
             <label class="opt-label group relative flex items-center gap-1 w-max" for="gbWordlist">
-              📖 ワードリスト (-w)
+              ワードリスト (-w)
               <svg class="w-3 h-3 text-gray-500 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
               <div class="hidden group-hover:block absolute left-0 top-full mt-1 w-48 p-2 bg-gray-800 text-white text-xs rounded z-50 border border-gray-600 shadow-lg font-normal normal-case">
                 探索に使用する辞書ファイル（ワードリスト）を指定します。
@@ -715,7 +808,7 @@
           <!-- 追加オプション -->
           <div>
             <label class="opt-label group relative flex items-center gap-1 w-max">
-              📋 追加オプション
+              追加オプション
               <svg class="w-3 h-3 text-gray-500 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
               <div class="hidden group-hover:block absolute left-0 top-full mt-1 w-48 p-2 bg-gray-800 text-white text-xs rounded z-50 border border-gray-600 shadow-lg font-normal normal-case">
                 その他のフラグを指定します。
@@ -736,7 +829,7 @@
           <!-- ターゲットURL -->
           <div>
             <label class="opt-label group relative flex items-center gap-1 w-max" for="curlTarget">
-              🌐 対象URL (url)
+              対象URL (url)
               <svg class="w-3 h-3 text-gray-500 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
               <div class="hidden group-hover:block absolute left-0 top-full mt-1 w-48 p-2 bg-gray-800 text-white text-xs rounded z-50 border border-gray-600 shadow-lg font-normal normal-case">
                 リクエストを送信する対象のURLを指定します。
@@ -748,7 +841,7 @@
           <!-- HTTPメソッド -->
           <div>
             <label class="opt-label group relative flex items-center gap-1 w-max" for="curlMethod">
-              🛠 HTTPメソッド (-X)
+              HTTPメソッド (-X)
               <svg class="w-3 h-3 text-gray-500 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
               <div class="hidden group-hover:block absolute left-0 top-full mt-1 w-48 p-2 bg-gray-800 text-white text-xs rounded z-50 border border-gray-600 shadow-lg font-normal normal-case">
                 リクエストに使用するHTTPメソッドを選択します。
@@ -767,7 +860,7 @@
           <!-- ヘッダー追加 -->
           <div>
             <label class="opt-label group relative flex items-center gap-1 w-max" for="curlHeader">
-              📝 ヘッダー追加 (-H)
+              ヘッダー追加 (-H)
               <svg class="w-3 h-3 text-gray-500 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
               <div class="hidden group-hover:block absolute left-0 top-full mt-1 w-48 p-2 bg-gray-800 text-white text-xs rounded z-50 border border-gray-600 shadow-lg font-normal normal-case">
                 リクエストに追加するヘッダーを指定します。
@@ -779,7 +872,7 @@
           <!-- 追加オプション -->
           <div>
             <label class="opt-label group relative flex items-center gap-1 w-max">
-              📋 追加オプション
+              追加オプション
               <svg class="w-3 h-3 text-gray-500 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
               <div class="hidden group-hover:block absolute left-0 top-full mt-1 w-48 p-2 bg-gray-800 text-white text-xs rounded z-50 border border-gray-600 shadow-lg font-normal normal-case">
                 その他のフラグを指定します。
@@ -809,17 +902,17 @@
         <!-- hydraオプションコンテナ -->
         <div id="hydraOptionsContainer" class="hidden flex-col gap-5">
           <div class="text-xs text-blue-400 bg-blue-900/30 p-3 rounded border border-blue-800 mb-2">
-            ℹ️ オンラインでのブルートフォース/辞書攻撃を検証します。
+            オンラインでのブルートフォース/辞書攻撃を検証します。
           </div>
           <div>
             <label class="opt-label group relative flex items-center gap-1 w-max" for="hydraTarget">
-              🎯 ターゲット (IP/URL)
+              ターゲット (IP/URL)
             </label>
             <input type="text" id="hydraTarget" value="127.0.0.1" placeholder="例: 127.0.0.1" />
           </div>
           <div>
             <label class="opt-label group relative flex items-center gap-1 w-max" for="hydraService">
-              🔌 対象サービス
+              対象サービス
             </label>
             <select id="hydraService">
               <option value="ssh">ssh</option>
@@ -829,13 +922,13 @@
           </div>
           <div>
             <label class="opt-label group relative flex items-center gap-1 w-max" for="hydraUser">
-              👤 ユーザー名 (-l / -L)
+              ユーザー名 (-l / -L)
             </label>
             <input type="text" id="hydraUser" value="admin" placeholder="例: admin" />
           </div>
           <div>
             <label class="opt-label group relative flex items-center gap-1 w-max" for="hydraWordlist">
-              📖 パスワード辞書 (-P)
+              パスワード辞書 (-P)
             </label>
             <select id="hydraWordlist">
               <option value="/usr/share/wordlists/passwords.txt">passwords.txt</option>
@@ -855,17 +948,17 @@
         <!-- aircrack-ngオプションコンテナ -->
         <div id="aircrackOptionsContainer" class="hidden flex-col gap-5">
           <div class="text-xs text-purple-400 bg-purple-900/30 p-3 rounded border border-purple-800 mb-2">
-            ℹ️ パケットキャプチャ（airodump-ng）で取得した暗号鍵データに対する、オフライン辞書攻撃を検証します。
+            パケットキャプチャ（airodump-ng）で取得した暗号鍵データに対する、オフライン辞書攻撃を検証します。
           </div>
           <div>
             <label class="opt-label group relative flex items-center gap-1 w-max" for="aircrackTarget">
-              📁 ターゲットファイル (.cap/.ivs)
+              ターゲットファイル (.cap/.ivs)
             </label>
             <input type="text" id="aircrackTarget" value="/usr/share/wordlists/wpa.cap" placeholder="例: /usr/share/wordlists/wpa.cap" />
           </div>
           <div>
             <label class="opt-label group relative flex items-center gap-1 w-max" for="aircrackWordlist">
-              📖 パスワード辞書 (-w)
+              パスワード辞書 (-w)
             </label>
             <select id="aircrackWordlist">
               <option value="/usr/share/wordlists/passwords.txt">passwords.txt</option>
@@ -873,7 +966,7 @@
           </div>
           <div>
             <label class="opt-label group relative flex items-center gap-1 w-max" for="aircrackBssid">
-              📡 対象BSSID (-b)
+              対象BSSID (-b)
             </label>
             <input type="text" id="aircrackBssid" placeholder="例: AA:BB:CC:DD:EE:FF" />
           </div>
@@ -882,17 +975,17 @@
         <!-- iperf3オプションコンテナ -->
         <div id="iperf3OptionsContainer" class="hidden flex-col gap-5">
           <div class="text-xs text-green-400 bg-green-900/30 p-3 rounded border border-green-800 mb-2">
-            ℹ️ iperf3を使用してネットワークの帯域幅を測定します。バックグラウンドでiperf3-serverが常時稼働しています。
+            iperf3を使用してネットワークの帯域幅を測定します。バックグラウンドでiperf3-serverが常時稼働しています。
           </div>
           <div>
             <label class="opt-label group relative flex items-center gap-1 w-max" for="iperf3Target">
-              🎯 ターゲットサーバー (-c)
+              ターゲットサーバー (-c)
             </label>
             <input type="text" id="iperf3Target" value="iperf3-server" placeholder="例: iperf3-server" />
           </div>
           <div>
             <label class="opt-label group relative flex items-center gap-1 w-max" for="iperf3Protocol">
-              🔌 プロトコル
+              プロトコル
             </label>
             <select id="iperf3Protocol">
               <option value="tcp">TCP</option>
@@ -901,13 +994,13 @@
           </div>
           <div>
             <label class="opt-label group relative flex items-center gap-1 w-max" for="iperf3Time">
-              ⏱ 実行時間 (-t)
+              実行時間 (-t)
             </label>
             <input type="number" id="iperf3Time" value="10" placeholder="秒数を入力 (例: 10)" />
           </div>
           <div>
             <label class="opt-label group relative flex items-center gap-1 w-max" for="iperf3Bandwidth">
-              📶 帯域幅指定 (-b)
+              帯域幅指定 (-b)
             </label>
             <input type="text" id="iperf3Bandwidth" placeholder="例: 10M, 1G (空欄は無制限)" />
           </div>
@@ -916,11 +1009,11 @@
         <!-- whoisオプションコンテナ（ターゲットのみ） -->
         <div id="whoisOptionsContainer" class="hidden flex-col gap-5">
           <div class="text-xs text-green-400 bg-green-900/30 p-3 rounded border border-green-800 mb-2">
-            ℹ️ whoisでドメインやIPアドレスの登録情報を照会します。
+            whoisでドメインやIPアドレスの登録情報を照会します。
           </div>
           <div>
             <label class="opt-label group relative flex items-center gap-1 w-max" for="whoisTarget">
-              🎯 ターゲット (ドメイン / IP)
+              ターゲット (ドメイン / IP)
             </label>
             <input type="text" id="whoisTarget" value="example.com" placeholder="例: example.com" />
           </div>
@@ -929,17 +1022,17 @@
         <!-- digオプションコンテナ -->
         <div id="digOptionsContainer" class="hidden flex-col gap-5">
           <div class="text-xs text-green-400 bg-green-900/30 p-3 rounded border border-green-800 mb-2">
-            ℹ️ digでDNSサーバーにレコードを問い合わせます。
+            digでDNSサーバーにレコードを問い合わせます。
           </div>
           <div>
             <label class="opt-label group relative flex items-center gap-1 w-max" for="digTarget">
-              🎯 ターゲット (ドメイン)
+              ターゲット (ドメイン)
             </label>
             <input type="text" id="digTarget" value="example.com" placeholder="例: example.com" />
           </div>
           <div>
             <label class="opt-label group relative flex items-center gap-1 w-max" for="digRecordType">
-              📄 レコード指定
+              レコード指定
             </label>
             <select id="digRecordType">
               <option value="A">A (IPv4アドレス)</option>
@@ -959,11 +1052,11 @@
         <!-- metasploitオプションコンテナ -->
         <div id="metasploitOptionsContainer" class="hidden flex-col gap-5">
           <div class="text-xs text-red-400 bg-red-900/30 p-3 rounded border border-red-800 mb-2">
-            ℹ️ Metasploit（非対話型）を利用して、選択したモジュールを実行します。
+            Metasploit（非対話型）を利用して、選択したモジュールを実行します。
           </div>
           <div>
             <label class="opt-label group relative flex items-center gap-1 w-max" for="msfModule">
-              🔫 モジュール選択 (use)
+              モジュール選択 (use)
             </label>
             <select id="msfModule">
               <option value="auxiliary/scanner/portscan/tcp">auxiliary/scanner/portscan/tcp</option>
@@ -973,13 +1066,13 @@
           </div>
           <div>
             <label class="opt-label group relative flex items-center gap-1 w-max" for="msfRhosts">
-              🎯 ターゲット (RHOSTS)
+              ターゲット (RHOSTS)
             </label>
             <input type="text" id="msfRhosts" value="dummy-web" placeholder="例: dummy-web" />
           </div>
           <div>
             <label class="opt-label group relative flex items-center gap-1 w-max" for="msfRport">
-              🔌 対象ポート (RPORT)
+              対象ポート (RPORT)
             </label>
             <input type="text" id="msfRport" placeholder="例: 21, 80, 445 (空欄でデフォルト)" />
           </div>
@@ -1020,6 +1113,12 @@
           <div class="term-info">オプションを選択して「実行する」ボタンを押してください。</div>
           <div class="term-info">コマンドはDockerコンテナ内のサンドボックスで実行されます。</div>
         </div>
+        <!-- 補助なしモード用: ターミナル入力（/api/execute/raw に送信） -->
+        <form class="raw-input-bar" id="rawInputBar" onsubmit="runRawCommand(event)">
+          <span class="term-prompt">student@sandbox:~$</span>
+          <input type="text" id="rawCommandInput" placeholder="コマンドを入力してください" autocomplete="off" spellcheck="false" />
+          <button type="submit" class="run-btn" id="rawRunBtn">▶ 実行</button>
+        </form>
       </div>
 
       <!-- AI解説エリア（中央カラム下部に固定） -->
@@ -1270,7 +1369,7 @@
     async function checkBackend() {
       const statusEl = document.getElementById("backendStatus");
       try {
-        const res = await fetch(`${API_BASE}/api/health`, { signal: AbortSignal.timeout(3000) });
+        const res = await fetch(`${API_BASE}/api/health`, { credentials: "include", signal: AbortSignal.timeout(3000) });
         if (!res.ok) throw new Error();
         statusEl.textContent = "● Backend: 接続OK";
         statusEl.style.color = "#3fb950";
@@ -1297,6 +1396,7 @@
 
       try {
         const res = await fetch(`${API_BASE}/api/sessions/${sessionId}`, {
+          credentials: "include",
           signal: AbortSignal.timeout(5000),
         });
         if (!res.ok) return;
@@ -1413,6 +1513,7 @@
 
       try {
         const res = await fetch(`${API_BASE}/api/materials`, {
+          credentials: "include",
           signal: AbortSignal.timeout(10000),
         });
         if (!res.ok) throw new Error("資料一覧を取得できませんでした。");
@@ -1454,6 +1555,7 @@
 
       try {
         const res = await fetch(`${API_BASE}/api/materials/upload`, {
+          credentials: "include",
           method: "POST",
           body: formData,
           signal: AbortSignal.timeout(120000),
@@ -1823,8 +1925,10 @@
 
         payload.current_step = document.getElementById("currentStep").value;
         payload.session_id = localStorage.getItem(SESSION_ID_KEY);
+        payload.condition = "with_ai";
 
         const res = await fetch(`${API_BASE}/api/execute`, {
+          credentials: "include",
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
@@ -1898,7 +2002,7 @@
         "-b": "<code>-b</code>: 対象BSSIDを指定します。",
       };
 
-      let html = `<p>🔍 <strong>コマンド解析:</strong> <code>${escapeHtml(cmdStr)}</code></p>`;
+      let html = `<p><strong>コマンド解析:</strong> <code>${escapeHtml(cmdStr)}</code></p>`;
       flags.forEach(flag => {
         const key = flag.split(" ")[0];
         if (explanations[key]) {
@@ -1909,7 +2013,166 @@
       document.getElementById("aiBody").innerHTML = html;
     }
 
+    // ─── 実験条件（with_ai: GUI + AI解説 / without_ai: ターミナルのみ）───
+    const CONDITION_KEY = "condition";
+    const CONDITION_LABELS = { with_ai: "補助あり（GUI）", without_ai: "補助なし（ターミナル）" };
+
+    function getCondition() {
+      const value = localStorage.getItem(CONDITION_KEY);
+      return value === "without_ai" ? "without_ai" : "with_ai";
+    }
+
+    function applyCondition() {
+      const condition = getCondition();
+      document.body.classList.toggle("mode-without-ai", condition === "without_ai");
+      document.getElementById("conditionToggle").textContent = `モード: ${CONDITION_LABELS[condition]} ⇄`;
+    }
+
+    function toggleCondition() {
+      localStorage.setItem(CONDITION_KEY, getCondition() === "with_ai" ? "without_ai" : "with_ai");
+      applyCondition();
+    }
+
+    async function runRawCommand(event) {
+      event.preventDefault();
+      const input = document.getElementById("rawCommandInput");
+      const runBtn = document.getElementById("rawRunBtn");
+      const rawCommand = input.value.trim();
+      if (!rawCommand) return;
+
+      input.disabled = true;
+      runBtn.disabled = true;
+      appendTerminal(`<span class="term-prompt">student@sandbox:~$</span> <span class="term-cmd">${escapeHtml(rawCommand)}</span>`);
+      appendTerminal(`<div class="loading-dots" id="loading"><span>.</span><span>.</span><span>.</span></div>`);
+
+      try {
+        const res = await fetch(`${API_BASE}/api/execute/raw`, {
+          credentials: "include",
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            raw_command: rawCommand,
+            current_step: document.getElementById("currentStep").value,
+          }),
+          signal: AbortSignal.timeout(120000),
+        });
+        document.getElementById("loading")?.remove();
+
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          appendTerminal(`<div class="term-error">エラー: ${escapeHtml(err.detail || res.statusText)}</div>`);
+        } else {
+          const data = await res.json();
+          if (data.session_id) {
+            localStorage.setItem(SESSION_ID_KEY, data.session_id);
+            formatSessionStatus();
+          }
+          if (data.stdout) appendTerminal(`<div class="term-output">${escapeHtml(data.stdout)}</div>`);
+          if (data.stderr) appendTerminal(`<div class="term-error">${escapeHtml(data.stderr)}</div>`);
+          if (data.exit_code === 0) {
+            appendTerminal(`<div class="term-success">✓ 終了コード: 0 (成功)</div>`);
+          } else {
+            appendTerminal(`<div class="term-error">✗ 終了コード: ${escapeHtml(data.exit_code)}</div>`);
+          }
+          input.value = "";
+        }
+      } catch (error) {
+        document.getElementById("loading")?.remove();
+        appendTerminal(`<div class="term-error">通信エラー: ${escapeHtml(error.message)}</div>`);
+      }
+
+      saveUiState();
+      input.disabled = false;
+      runBtn.disabled = false;
+      input.focus();
+    }
+
+    function showLoginScreen() {
+      document.body.classList.remove("auth-pending", "auth-main");
+      document.body.classList.add("auth-login");
+      document.getElementById("loginPassword").value = "";
+    }
+
+    function showMainScreen(uid) {
+      document.getElementById("currentUser").textContent = `ログイン中: ${uid}`;
+      applyCondition();
+      document.body.classList.remove("auth-pending", "auth-login");
+      document.body.classList.add("auth-main");
+    }
+
+    let mainInitialized = false;
+    async function enterMain(uid) {
+      showMainScreen(uid);
+      if (mainInitialized) {
+        await checkBackend();
+        await loadMaterials();
+        return;
+      }
+      mainInitialized = true;
+      await initMain();
+    }
+
+    async function submitLogin(event) {
+      event.preventDefault();
+      const errEl = document.getElementById("loginError");
+      const btn = document.getElementById("loginSubmit");
+      errEl.textContent = "";
+      btn.disabled = true;
+      try {
+        const res = await fetch(`${API_BASE}/api/login`, {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            uid: document.getElementById("loginUid").value.trim(),
+            password: document.getElementById("loginPassword").value,
+          }),
+        });
+        if (res.status === 401) {
+          errEl.textContent = "学籍番号またはパスワードが正しくありません";
+          return;
+        }
+        if (!res.ok) throw new Error();
+        // ログイン画面で選択した実験条件を保存する
+        localStorage.setItem(
+          CONDITION_KEY,
+          document.querySelector('input[name="loginCondition"]:checked')?.value === "without_ai" ? "without_ai" : "with_ai"
+        );
+        const meRes = await fetch(`${API_BASE}/api/me`, { credentials: "include" });
+        const me = meRes.ok ? await meRes.json() : {};
+        await enterMain(me.uid || document.getElementById("loginUid").value.trim());
+      } catch {
+        errEl.textContent = "ログインに失敗しました。サーバーに接続できません。";
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    async function logout() {
+      try {
+        await fetch(`${API_BASE}/api/logout`, { method: "POST", credentials: "include" });
+      } catch {
+      }
+      showLoginScreen();
+    }
+
     async function initApp() {
+      try {
+        const res = await fetch(`${API_BASE}/api/me`, {
+          credentials: "include",
+          signal: AbortSignal.timeout(5000),
+        });
+        if (res.ok) {
+          const me = await res.json();
+          await enterMain(me.uid);
+          return;
+        }
+      } catch {
+      }
+      showLoginScreen();
+    }
+
+    async function initMain() {
       defaultTerminalMarkup = document.getElementById("terminalBody").innerHTML;
       defaultAiMarkup = document.getElementById("aiBody").innerHTML;
 

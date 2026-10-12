@@ -73,6 +73,18 @@ class Session(Base):
         onupdate=datetime.utcnow,       # UPDATE 時も自動で現在時刻に更新
     )
 
+    # ユーザ専用 Docker ネットワーク名（cui-network-<uid>）
+    container_network = Column(
+        String,                         # ネットワーク名
+        nullable=True,                  # コンテナ未起動時は NULL
+    )
+
+    # ユーザ専用コンテナ群の起動時刻
+    containers_started_at = Column(
+        DateTime,                       # 日時型
+        nullable=True,                  # コンテナ未起動時は NULL
+    )
+
     # リレーションシップ: このセッションに紐づく command_logs の一覧を取得できる
     # cascade="all, delete-orphan": セッション削除時に紐づくログも自動削除する
     logs = relationship(
@@ -172,6 +184,12 @@ class CommandLog(Base):
         DateTime,                       # 日時型
         nullable=False,                 # NULL を許可しない
         default=datetime.utcnow,        # INSERT 時に現在の UTC 時刻を自動設定
+    )
+
+    # 実験条件（"with_ai" = GUI + AI解説あり / "without_ai" = ターミナルのみ）
+    condition = Column(
+        String,                         # 文字列型
+        nullable=True,                  # 既存ログとの互換性のため NULL を許可
     )
 
     # リレーションシップ: 紐づく Session オブジェクトを取得できる

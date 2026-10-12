@@ -10,6 +10,7 @@ CUI Learning WebUI — FastAPI バックエンド
   GET  /api/me       : ログイン中ユーザの確認
 """
 
+import asyncio
 import logging
 import ipaddress
 import os
@@ -22,18 +23,22 @@ from datetime import datetime, timezone
 from urllib.parse import quote
 from urllib.parse import urlparse
 
-from fastapi import FastAPI, HTTPException, Depends, File, UploadFile, Response
+from fastapi import FastAPI, HTTPException, Depends, File, UploadFile, Response, Request
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 
 from executor import run_command_in_sandbox
+from container_manager import (
+    start_user_containers, stop_user_containers,
+    get_user_container_names, get_user_network_name,
+)
 from models import (
     NmapOptions, GobusterOptions, CurlOptions, HydraOptions,
     AircrackOptions, Iperf3Options, MetasploitOptions,
     WhoisOptions, DigOptions,
-    ExecuteRequest, ExecuteResponse, SessionStateResponse,
+    ExecuteRequest, RawExecuteRequest, ExecuteResponse, SessionStateResponse,
     MaterialFileInfo, MaterialListResponse, MaterialUploadResponse,
 )
 from commands import (
@@ -43,11 +48,12 @@ from commands import (
     build_whois_command, build_dig_command,
 )
 from ai_service import build_llm_context, generate_ai_response
+from raw_parser import parse_raw_command, RawCommandError
 from database import get_db, init_db
 from db_models import Session as DBSession, CommandLog, User
 from auth import (
     authenticate_ldap, create_session_cookie, get_current_user,
-    is_skip_auth, DEV_USER_UID,
+    verify_session_cookie, is_skip_auth, DEV_USER_UID,
     SESSION_COOKIE_NAME, SESSION_MAX_AGE,
 )
 
@@ -60,6 +66,9 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
 logger = logging.getLogger(__name__)
+
+# 実験条件: with_ai = GUI + AI解説あり / without_ai = ターミナルのみ（AI解説なし）
+VALID_CONDITIONS = {"with_ai", "without_ai"}
 
 APP_DIR = Path(__file__).resolve().parent
 PERSISTENT_DATA_DIR = Path("/app/data")
@@ -105,6 +114,8 @@ app.add_middleware(
 # ──────────────────────────────────────────────
 # セキュリティ検証（ターゲットホワイトリスト）
 # ──────────────────────────────────────────────
+# SKIP_AUTH（開発モード）用のフォールバック。
+# 通常時は get_user_container_names(uid) によるユーザ専用ホスト名で動的に検証する。
 _ALLOWED_HOSTNAMES = {
     "127.0.0.1",
     "localhost",
@@ -118,8 +129,26 @@ _ALLOWED_HOSTNAMES = {
 }
 
 
-def is_safe_target(target_input: str) -> bool:
-    """ターゲットがホワイトリストに登録された安全な対象かを検証する。"""
+def _build_allowed_hostnames(uid: str) -> set[str]:
+    """
+    ユーザ専用コンテナ名（dvwa-<uid> 等）とその論理名（dvwa 等）、
+    および外部に出ない共通ホストをホワイトリストとして返す。
+    """
+    names = get_user_container_names(uid)
+    return (
+        {v.lower() for v in names.values()}
+        | set(names.keys())
+        | {"127.0.0.1", "localhost", "example.com"}
+    )
+
+
+def is_safe_target(target_input: str, allowed_hostnames: set[str] | None = None) -> bool:
+    """
+    ターゲットがホワイトリストに登録された安全な対象かを検証する。
+    allowed_hostnames 未指定時は静的な _ALLOWED_HOSTNAMES を使う。
+    """
+    if allowed_hostnames is None:
+        allowed_hostnames = _ALLOWED_HOSTNAMES
     if not target_input:
         return False
 
@@ -144,7 +173,7 @@ def is_safe_target(target_input: str) -> bool:
 
         hostname = hostname.lower()
 
-        if hostname in _ALLOWED_HOSTNAMES:
+        if hostname in allowed_hostnames:
             continue
 
         # プライベート IP アドレス（192.168.x.x 等）も許可
@@ -279,6 +308,22 @@ async def login(
         user.last_login_at = now_utc
     db.commit()
 
+    # ユーザ専用コンテナ群を起動（失敗時は起動済みのものを削除した上でエラーを返す）
+    try:
+        container_info = await asyncio.to_thread(start_user_containers, user_info["uid"])
+    except Exception as e:
+        logger.error("[container] ユーザ %s のコンテナ起動に失敗: %s", user_info["uid"], e)
+        raise HTTPException(
+            status_code=503,
+            detail="演習環境の起動に失敗しました。しばらくしてから再度お試しください。",
+        )
+
+    # セッションにコンテナ情報を紐付ける（session_id はユーザ uid で固定）
+    db_session = _get_or_create_session(db, user_info["uid"], "Step 1")
+    db_session.container_network = container_info["network"]
+    db_session.containers_started_at = now_utc
+    db.commit()
+
     response.set_cookie(
         key=SESSION_COOKIE_NAME,
         value=create_session_cookie(user_info["uid"]),
@@ -291,9 +336,30 @@ async def login(
 
 
 @app.post("/api/logout")
-async def logout(response: Response):
-    """セッションクッキーを削除する。"""
+async def logout(
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db),
+):
+    """セッションクッキーを削除し、ユーザ専用コンテナ群を破棄する。"""
     response.delete_cookie(key=SESSION_COOKIE_NAME)
+
+    # SKIP_AUTH 時はコンテナを扱わない
+    if not is_skip_auth():
+        token = request.cookies.get(SESSION_COOKIE_NAME)
+        uid = verify_session_cookie(token) if token else None
+        if uid:
+            try:
+                await asyncio.to_thread(stop_user_containers, uid)
+            except Exception as e:
+                logger.error("[container] ユーザ %s のコンテナ停止に失敗: %s", uid, e)
+            db_session = (
+                db.query(DBSession).filter(DBSession.session_id == uid).first()
+            )
+            if db_session is not None:
+                db_session.container_network = None
+                db_session.containers_started_at = None
+                db.commit()
     return {"status": "ok"}
 
 
@@ -414,6 +480,12 @@ async def execute_command(
             detail=f"ツール '{req.tool}' はサポートされていません。対応ツール: {ALLOWED_TOOLS}",
         )
 
+    if req.condition not in VALID_CONDITIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"condition は {sorted(VALID_CONDITIONS)} のいずれかを指定してください。",
+        )
+
     # ── ターゲット検証 ──
     if req.tool in ("whois", "dig"):
         # 任意のドメイン/IPを許可するため is_safe_target は適用しない。
@@ -437,8 +509,11 @@ async def execute_command(
     else:
         target_str = None
 
+    # 通常時はユーザ専用コンテナ名による動的ホワイトリスト、SKIP_AUTH 時は静的フォールバック
+    allowed_hostnames = None if is_skip_auth() else _build_allowed_hostnames(uid)
+
     if target_str is not None and (
-        not isinstance(target_str, str) or not is_safe_target(target_str)
+        not isinstance(target_str, str) or not is_safe_target(target_str, allowed_hostnames)
     ):
         raise HTTPException(
             status_code=400,
@@ -450,7 +525,11 @@ async def execute_command(
         )
 
     # ── コマンド構築 ──
-    compose_network = os.environ.get("DOCKER_NETWORK", "cui-learning-network")
+    # 通常時はユーザ専用ネットワーク上で実行し、dvwa 等の名前をユーザ専用コンテナに解決させる
+    if is_skip_auth():
+        compose_network = os.environ.get("DOCKER_NETWORK", "cui-learning-network")
+    else:
+        compose_network = get_user_network_name(uid)
     network_mode = "none"  # デフォルト: 外部通信を遮断
 
     if req.tool == "nmap":
@@ -496,11 +575,34 @@ async def execute_command(
     )
     logger.info("Built command: %s", command_str)
 
+    return await _run_and_log(
+        db=db, uid=uid, req=req, tool=req.tool, command=command,
+        command_str=command_str, image=image, network_mode=network_mode,
+        current_step=req.current_step, condition=req.condition,
+    )
+
+
+async def _run_and_log(
+    db: Session,
+    uid: str,
+    req: ExecuteRequest | None,
+    tool: str,
+    command: list[str],
+    command_str: str,
+    image: str,
+    network_mode: str,
+    current_step: str,
+    condition: str,
+) -> ExecuteResponse:
+    """
+    /api/execute と /api/execute/raw 共通の処理:
+    セッション管理 → コンテナ実行 → AI解説（with_ai のみ）→ DB ログ保存。
+    """
     # ── セッション管理 ──
     db_session = _get_or_create_session(
         db=db,
         session_id=uid,  # ユーザごとに session_id を固定（ログをユーザに紐付ける）
-        current_step=req.current_step,
+        current_step=current_step,
     )
     active_session_id = db_session.session_id
 
@@ -508,6 +610,14 @@ async def execute_command(
     is_help = _is_help_request(command)
 
     # ── コマンド実行 ──
+    # バックエンド再起動などでコンテナが消えていても復旧できるよう、起動済みなら即返る関数を呼ぶ
+    if not is_skip_auth() and network_mode != "none":
+        try:
+            await asyncio.to_thread(start_user_containers, uid)
+        except Exception as e:
+            logger.error("[container] ユーザ %s のコンテナ確認に失敗: %s", uid, e)
+            raise HTTPException(status_code=503, detail="演習環境の準備に失敗しました。")
+
     exec_start = time.monotonic()
     result = run_command_in_sandbox(command, image=image, network_mode=network_mode)
     execution_duration = time.monotonic() - exec_start
@@ -517,37 +627,43 @@ async def execute_command(
     cmd_stderr = result.get("stderr", "")
 
     # ── AI フィードバック生成 ──
-    llm_context_json = build_llm_context(
-        req,
-        command,
-        exit_code,
-        stdout=cmd_stdout,
-        stderr=cmd_stderr,
-        time_since_last_cmd=time_since_last,
-        is_help_request=is_help,
-    )
-    logger.info("LLM Context: %s", llm_context_json)
+    if condition == "without_ai" or req is None:
+        # 補助なし条件: AI 生成をスキップする
+        ai_explanation = ""
+        ai_highlights: list[str] = []
+    else:
+        llm_context_json = build_llm_context(
+            req,
+            command,
+            exit_code,
+            stdout=cmd_stdout,
+            stderr=cmd_stderr,
+            time_since_last_cmd=time_since_last,
+            is_help_request=is_help,
+        )
+        logger.info("LLM Context: %s", llm_context_json)
 
-    ai_result = generate_ai_response(
-        llm_context_json=llm_context_json,
-        tool=req.tool,
-        time_since_last_cmd=time_since_last,
-        is_help_request=is_help,
-    )
-    ai_explanation = ai_result.get("message", "")
-    ai_highlights = ai_result.get("highlights", [])
+        ai_result = generate_ai_response(
+            llm_context_json=llm_context_json,
+            tool=tool,
+            time_since_last_cmd=time_since_last,
+            is_help_request=is_help,
+        )
+        ai_explanation = ai_result.get("message", "")
+        ai_highlights = ai_result.get("highlights", [])
 
     # ── ログを DB に保存 ──
-    options_str = " ".join(opt for opt in command if opt != req.tool) or None
+    options_str = " ".join(opt for opt in command if opt != tool) or None
     log_entry = CommandLog(
         session_id=active_session_id,
-        tool_name=req.tool,
+        tool_name=tool,
         command_options=options_str,
         exit_code=exit_code,
         ai_response=ai_explanation,
         execution_duration=execution_duration,
         time_since_last_cmd=time_since_last,
         is_help_request=is_help,
+        condition=condition,
         created_at=datetime.now(timezone.utc).replace(tzinfo=None),
     )
     db.add(log_entry)
@@ -555,8 +671,8 @@ async def execute_command(
     db.refresh(log_entry)
 
     logger.info(
-        "[db] CommandLog 保存完了: log_id=%d, session=%s, tool=%s, exit=%d, duration=%.3fs",
-        log_entry.log_id, active_session_id, req.tool, exit_code, execution_duration,
+        "[db] CommandLog 保存完了: log_id=%d, session=%s, tool=%s, exit=%d, duration=%.3fs, condition=%s",
+        log_entry.log_id, active_session_id, tool, exit_code, execution_duration, condition,
     )
 
     return ExecuteResponse(
@@ -567,6 +683,78 @@ async def execute_command(
         ai_explanation=ai_explanation,
         session_id=active_session_id,
         ai_highlights=ai_highlights,
+    )
+
+
+# ツール名 → 実行イメージ（/api/execute/raw 用。/api/execute の分岐と同じ対応）
+_TOOL_IMAGES = {
+    "nmap": "instrumentisto/nmap:latest",
+    "gobuster": "secsi/gobuster:latest",
+    "curl": "curlimages/curl:latest",
+    "hydra": "cui-learning-sandbox:latest",
+    "aircrack-ng": "cui-learning-sandbox:latest",
+    "iperf3": "networkstatic/iperf3:latest",
+    "metasploit": "metasploitframework/metasploit-framework:latest",
+    "whois": "cui-learning-sandbox:latest",
+    "dig": "cui-learning-sandbox:latest",
+}
+
+
+@app.post("/api/execute/raw", response_model=ExecuteResponse)
+async def execute_raw_command(
+    req: RawExecuteRequest,
+    db: Session = Depends(get_db),
+    uid: str = Depends(get_current_user),
+):
+    """
+    補助なし（ターミナル）モード用。生コマンド文字列を検証・分解して Docker サンドボックスで実行する。
+    シェルには渡さず、ツール名の検証とターゲットのホワイトリストチェックを必ず通す。
+    condition は常に "without_ai"（AI 解説なし）として扱う。
+    """
+    # ── ツール名・構文の検証 ──
+    try:
+        parsed = parse_raw_command(req.raw_command)
+    except RawCommandError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    # ── ターゲット検証 ──
+    allowed_hostnames = None if is_skip_auth() else _build_allowed_hostnames(uid)
+    for target in parsed.targets:
+        if not is_safe_target(target, allowed_hostnames):
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "安全上の理由から、指定されたターゲットへの実行は制限されています。"
+                    "指定可能なターゲット: localhost, 127.0.0.1, dummy-web, example.com, "
+                    "dvwa, metasploitable, mysql, iperf3-server、またはプライベートIPアドレス（192.168.x.x 等）"
+                ),
+            )
+
+    # ── コマンド構築 ──
+    if is_skip_auth():
+        compose_network = os.environ.get("DOCKER_NETWORK", "cui-learning-network")
+    else:
+        compose_network = get_user_network_name(uid)
+
+    tool = parsed.tool
+    if tool == "metasploit":
+        command = build_metasploit_command(MetasploitOptions(**parsed.metasploit))
+    elif tool in ("hydra", "aircrack-ng", "whois", "dig"):
+        # これらはツール名を先頭に含めたコマンドをサンドボックスへ渡す（/api/execute と同じ）
+        command = [tool] + parsed.args
+    else:
+        command = parsed.args
+
+    # aircrack-ng は外部通信を遮断（/api/execute と同じ）
+    network_mode = "none" if tool == "aircrack-ng" else compose_network
+
+    command_str = req.raw_command.strip()
+    logger.info("Raw command: %s", command_str)
+
+    return await _run_and_log(
+        db=db, uid=uid, req=None, tool=tool, command=command,
+        command_str=command_str, image=_TOOL_IMAGES[tool], network_mode=network_mode,
+        current_step=req.current_step, condition="without_ai",
     )
 
 
