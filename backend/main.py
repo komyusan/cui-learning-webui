@@ -45,7 +45,7 @@ from commands import (
     ALLOWED_TOOLS, build_nmap_command, build_gobuster_command,
     build_curl_command, build_hydra_command, build_aircrack_command,
     build_iperf_command, build_metasploit_command,
-    build_whois_command, build_dig_command,
+    build_whois_command, build_dig_command, OptionNotAllowedError,
 )
 from ai_service import build_llm_context, generate_ai_response
 from raw_parser import parse_raw_command, RawCommandError
@@ -532,41 +532,44 @@ async def execute_command(
         compose_network = get_user_network_name(uid)
     network_mode = "none"  # デフォルト: 外部通信を遮断
 
-    if req.tool == "nmap":
-        command = build_nmap_command(NmapOptions(**req.options))
-        image = "instrumentisto/nmap:latest"
-        network_mode = compose_network
-    elif req.tool == "gobuster":
-        command = build_gobuster_command(GobusterOptions(**req.options))
-        image = "secsi/gobuster:latest"
-        network_mode = compose_network
-    elif req.tool == "curl":
-        command = build_curl_command(CurlOptions(**req.options))
-        image = "curlimages/curl:latest"
-        network_mode = compose_network
-    elif req.tool == "hydra":
-        command = ["hydra"] + build_hydra_command(HydraOptions(**req.options))
-        image = "cui-learning-sandbox:latest"
-        network_mode = compose_network
-    elif req.tool == "aircrack-ng":
-        command = ["aircrack-ng"] + build_aircrack_command(AircrackOptions(**req.options))
-        image = "cui-learning-sandbox:latest"
-    elif req.tool == "iperf3":
-        command = build_iperf_command(Iperf3Options(**req.options))
-        image = "networkstatic/iperf3:latest"
-        network_mode = compose_network
-    elif req.tool == "metasploit":
-        command = build_metasploit_command(MetasploitOptions(**req.options))
-        image = "metasploitframework/metasploit-framework:latest"
-        network_mode = compose_network
-    elif req.tool == "whois":
-        command = build_whois_command(WhoisOptions(**req.options))
-        image = "cui-learning-sandbox:latest"
-        network_mode = compose_network
-    elif req.tool == "dig":
-        command = build_dig_command(DigOptions(**req.options))
-        image = "cui-learning-sandbox:latest"
-        network_mode = compose_network
+    try:
+        if req.tool == "nmap":
+            command = build_nmap_command(NmapOptions(**req.options))
+            image = "instrumentisto/nmap:latest"
+            network_mode = compose_network
+        elif req.tool == "gobuster":
+            command = build_gobuster_command(GobusterOptions(**req.options))
+            image = "secsi/gobuster:latest"
+            network_mode = compose_network
+        elif req.tool == "curl":
+            command = build_curl_command(CurlOptions(**req.options))
+            image = "curlimages/curl:latest"
+            network_mode = compose_network
+        elif req.tool == "hydra":
+            command = ["hydra"] + build_hydra_command(HydraOptions(**req.options))
+            image = "cui-learning-sandbox:latest"
+            network_mode = compose_network
+        elif req.tool == "aircrack-ng":
+            command = ["aircrack-ng"] + build_aircrack_command(AircrackOptions(**req.options))
+            image = "cui-learning-sandbox:latest"
+        elif req.tool == "iperf3":
+            command = build_iperf_command(Iperf3Options(**req.options))
+            image = "networkstatic/iperf3:latest"
+            network_mode = compose_network
+        elif req.tool == "metasploit":
+            command = build_metasploit_command(MetasploitOptions(**req.options))
+            image = "metasploitframework/metasploit-framework:latest"
+            network_mode = compose_network
+        elif req.tool == "whois":
+            command = build_whois_command(WhoisOptions(**req.options))
+            image = "cui-learning-sandbox:latest"
+            network_mode = compose_network
+        elif req.tool == "dig":
+            command = build_dig_command(DigOptions(**req.options))
+            image = "cui-learning-sandbox:latest"
+            network_mode = compose_network
+    except OptionNotAllowedError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
     # hydra / aircrack-ng はツール名がすでに先頭にある
     command_str = (
