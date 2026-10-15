@@ -1,4 +1,13 @@
 services:
+  sandbox:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.sandbox
+    image: cui-learning-sandbox:latest
+    command: ["echo", "sandbox image built"]
+    profiles:
+      - build-only
+
   backend:
     build: ./backend
     env_file:
